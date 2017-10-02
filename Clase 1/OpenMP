@@ -1,0 +1,24 @@
+gcc -o pp1 pp1.c
+gcc -fopenmp -o pp1 pp1.c
+
+Usuario: acolaz
+Password: ac123456
+ssp secure copy 
+
+Lo mas aconsejable es aprender a usar el VI y programar desde el shell.
+Resumen de instrucciones de VI, sino hay un tutorial en el LEV (Vine Cheat Sheet).
+
+Shared (j) - Se comparte la variable. La variable tiene un espacio en memoria asignado y esto se comparte por todos los hilos.
+Private (i) - Se hace una copia para cada hilo.
+
+Cuando uno hace procesamiento no tiene sentido hacer mas threads de la cantidad de core fisicos que hay. El hyperthreading sirve para comunicaciones, bases de datos, etc. Pero para el caso de procesamiento intensivo en paralelo no sirve. Es mas conveniente secuencializar que competir.
+
+Depende del volumen de datos y del tamanio de la cache, si tiene sentido programar en paralelo.
+En bruto, tiene sentido paralelizar si nos sobrepasamos del volumen de la cache. Sino tiene mas sentido hacerlo secuencial. No estoy seguro de cual es la razon de esto.
+
+#pragma omp critical
+#pragma omp atomic
+
+
+Diferencia entre private y lastprivate?
+Como medir el tiempo que tarda con la libreria openmp.
