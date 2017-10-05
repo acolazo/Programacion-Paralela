@@ -1,0 +1,106 @@
+Falte a la clase 2.
+
+Usuario: acolaz
+Password: ac123456
+rocks list host
+cat /proc/cpuinfo - para poder ver la info del cpu
+lscpu
+who
+Copiar desde el directorio de gustavo a los nuestros.
+Como mostrar los archivos con sus tamanios.
+Diff - Muestra las diferencias entre los archivos
+
+export OMP_NUM_THREADS=4
+
+uname -a
+ssh nombre_de_maquina
+Por ej: ssh pulqui
+ssh acolaz@200.16.19.197
+
+Processor (Cuenta de fisicos y logicos), Physical ID, Core ID, Cache Size, Siblings
+
+Hyperthreading: Engania al sistema operativo y dice que tiene mas procesadores disponibles de los que en realidad tiene.
+Por cada core fisico, tiene dos core logicos. Este se hace a traves del hyperthreading. Tiene duplicados los stack y los registros, pero tiene un solo pipeline. El hyperthreading aprovecha el tiempo muerto que tiene un procesador cuando tiene que buscar datos a memoria o esperar red/disco.
+
+Como ver datos de la maquina?
+
+-js exit
+cpuinfo
+
+Para nosotros no sirve el Hyperthreading, sino que utilizar hasta el numero de core fisicos que hay. Ya que intentamos que no haya tiempo muerto.
+
+Registros
+Low Level Cache - Tiene megas
+Last Level Cache
+Ram
+HDD
+
+Localidad Espacial: Lo mas probable es que yo use lo que acabo de usar o algo que este cerca de eso.
+
+Si declaro private la variable, cuando salgo del for, no se actualiza el valor, lo pierdo.
+
+Shared(Sum[Number_Threads])
+Sum[Number_Threads]
+th=omp_get_threadnum();
+Sum = sum[th] + ...;
+
+Sum = Sum[0] + ... + Sum[Number_Threads - 1]
+
+Esto anda mal.
+Lo que se marca como sucio son los bloques, no los bytes individuales.
+Al usar bytes contiguos en el arreglo, cuando un hilo marca como sucio ese bloque de memoria. El resto de los hilos tienen que esperar a que sea actualizado. Esta bien logicamente (desde la concurrencia), pero por el marcado de sucio de las cache y las fallas de cache, el rendimiento es malo. Ya que los bloques se tienen que actualizar para que los puedan usar otros hilos.
+
+La solucion es alinear la memoria, darle a cada variable un espacio en en bloques distintos de la memoria.
+En bloques de 64 bytes.
+Sum [0] - hilo 1
+Sum [16] - hilo 2
+Sum [32] - hilo 3
+Sum [48] - hilo 4
+Sum[Number_Thread * Block Size]
+
+Por esto es importante el block cache size!
+No entiendo porque el shared [arreglo] no se corrompe con esto de que se mueven como bloques.
+
+Optimizacion en la generacion de codigo:
+-O0 Sin Optimizacion
+-O3 Mejor Optimizacion
+
+Con esto logramos un orden de magnitud menos. En la pagina de GCC dice que optimizaciones hace el compilador.
+
+Alineamiento:
+El alineamiento mejora el rendimiento. Y al aumentar la cantidad de hilos, sigue mejorando.
+Mientras que sin alinear el rendimiento es bastante malo, incluso si aumentamos los hilos.
+
+Conclusiones:
+Sin optimizar, es importante el alineamiento. Sino, escala mal al aumentar los hilos.
+Al optimizar, el optimizador se encarga del alinamiento.
+
+
+Reduction (Operacion, variable shared) - soluciona todo lo que vimos hasta ahora
+Con esta instruccion te olvidas del alineamiento, de la concurrencia y de las sumas parciales. Que es todo lo que vimos hasta ahora en esta clase.
+Reduce en una dimension los datos. Buscar de esto en internet.
+Modo de usar: for (... )(shared... private... reduction...)
+
+Extension del alcance y multiplicacion de matrices.
+
+dotprod() - Producto punto?
+
+Alcance dinamico de la region paralela es dinamico ya que un for se ejecuta en paralelo por mas de que este fuera de una region paralela.
+
+Lo normal es el alcance estatico (esto es lo que pasa con las variables). Fuera de una funcion las variables mueren a menos que se las declaren globales. Tienen una visibilidad estatica.
+
+Alcance dinamico: Puedo definir la funcion fuera de regiones paralelas. Si la llamo desde una region paralela va a ejecutarse en paralelo. Pero si la llamo desde una region no paralela va a ejecutarse en secuencial.
+Si tengo una funcion que genera paralelismo y la llamo desde una region paralela, se va a anidar el paralelismo.
+
+
+Multiplicacion de matrices:
+for (i)
+for (k)
+for (j)
+c[i,j] += a[i,k] + b[k,j]
+
+De este disminuimos las fallas de cache, y mejoramos la localidad espacial.
+
+No solo hay que tener Speedup y escalabilidad en cuenta. Sino que tambien hay que tener en cuenta la eficiencia del core en el codigo secuencial y las fallas de cache. Un programa puede escalar muy bien pero tener mala eficiencia.
+
+Hay un modo mas eficiente que es dividiendo en bloques, con bloques de bloques. Hay que hacer un sextuple for.
