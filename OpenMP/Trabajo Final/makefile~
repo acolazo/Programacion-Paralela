@@ -1,4 +1,4 @@
 all:
-	gcc -fopenmp -o sec secuencial.c
+	gcc -o sec secuencial.c -fopenmp -mavx
 clean:
 	rm sec

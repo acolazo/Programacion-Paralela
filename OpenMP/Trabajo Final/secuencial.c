@@ -1,9 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
 
-#define TAMANO 5
+
+#define TAMANO 800
+#define CACHE_BLOCK_SIZE 64
 int main(){
+
+	double start_time = omp_get_wtime();
+	const int block_size = CACHE_BLOCK_SIZE / sizeof(float); // 64 = common cache line size
 	int i, j, k;
+
 	/* i = filas - j = columnas */
 
 	/* Alojo Memoria */
@@ -29,6 +36,7 @@ int main(){
 	}
 
 	/* Inicializo Matrices */
+	/* Row-major order */
 	for(i=0; i<TAMANO; i++)
 		matrizB[i][i] = 1;
 	for(i = 0; i<TAMANO; i++){
@@ -41,6 +49,16 @@ int main(){
 	/* Hago la Multiplicacion */
 	/* Hay que hacer seis bucles */
 	
+		/*
+	for(i = 0; i<TAMANO; i++){
+		for(j = 0; j<TAMANO; j++){
+			for(k = 0; k<TAMANO; k++){
+				matrizC[i][j] += matrizA[i][k] * matrizB[k][j];
+			}
+		}
+	}
+	*/
+
 	for(i = 0; i<TAMANO; i++){
 		for(k = 0; k<TAMANO; k++){
 			for(j = 0; j<TAMANO; j++){
@@ -48,15 +66,17 @@ int main(){
 			}
 		}
 	}
-	
+
 
 	/* Mostrar Resultados */
+	/*
 	for(i = 0; i<TAMANO; i++){
 		printf("\n");
 		for(j = 0; j<TAMANO; j++){
 			printf("%f    ", matrizC[i][j]);
 		}
 	}
+	*/
 
 
 	/* Libero Memoria */
@@ -70,6 +90,8 @@ int main(){
 	free(matrizC);
 	
 
-	printf("\n");
+	double time = omp_get_wtime() - start_time;
+	printf("El tiempo de ejecucion es: %lf segundos\n", time);
+
 	return;
 }
