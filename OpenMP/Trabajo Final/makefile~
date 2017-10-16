@@ -1,4 +1,6 @@
 all:
 	gcc -o sec secuencial.c -fopenmp -mavx
+	gcc -o ani anidado.c -fopenmp -mavx
 clean:
 	rm sec
+	rm ani
