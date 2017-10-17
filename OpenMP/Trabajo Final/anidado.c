@@ -3,7 +3,7 @@
 #include <omp.h>
 
 
-#define THREADS 2
+#define THREADS 4
 #define TAMANO 2000
 #define TILE_SIZE 256
 int main(){
@@ -55,8 +55,8 @@ int main(){
 	*/
 
 	#pragma omp for
-	#pragma omp simd
 	for(i = 0; i<TAMANO; i++){
+		#pragma omp simd
 		for(j = 0; j<TAMANO; j++){
 			matrizA[i][j] =1;
 			matrizB[i][j] =1;
@@ -81,8 +81,7 @@ int main(){
 	}
 	*/
 
-	#pragma omp for 
-	#pragma omp simd
+	#pragma omp for
 	for(i = 0; i<TAMANO; i+= TILE_SIZE){
 		imax = i + TILE_SIZE > TAMANO ? TAMANO : i + TILE_SIZE;
 		for(k = 0; k<TAMANO; k+= TILE_SIZE){
@@ -91,6 +90,7 @@ int main(){
 				jmax = j + TILE_SIZE > TAMANO ? TAMANO : j + TILE_SIZE;
 				for(ia=i; ia<imax; ia++){
 					for(ka=k; ka<kmax; ka++){
+						#pragma omp simd
 						for(ja=j; ja<jmax; ja++){
 							matrizC[ia][ja] += matrizA[ia][ka] * matrizB[ka][ja];
 						}
@@ -130,5 +130,5 @@ int main(){
 	double time = omp_get_wtime() - start_time;
 	printf("El tiempo de ejecucion es: %lf segundos\n", time);
 
-	return;
+	return 1;
 }

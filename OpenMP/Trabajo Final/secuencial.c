@@ -3,7 +3,7 @@
 #include <omp.h>
 
 
-#define TAMANO 1250
+#define TAMANO 2000
 #define CACHE_BLOCK_SIZE 64
 int main(){
 
@@ -94,5 +94,5 @@ int main(){
 	double time = omp_get_wtime() - start_time;
 	printf("El tiempo de ejecucion es: %lf segundos\n", time);
 
-	return;
+	return 1;
 }
