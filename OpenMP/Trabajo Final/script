@@ -1,12 +1,12 @@
 #!/bin/bash
 # declare STRING variable
 
-#exec &>> your_file.log
+exec &>> your_file.log
 #print variable on a screen
 
 COUNT=5
 COUNT_THREADS=3
-FLAGS=3
+FLAGS=4
 THREADS=2
 echo "Name_of_TestA"
 
@@ -14,12 +14,12 @@ echo "Name_of_TestA"
 while [ $FLAGS -gt 0 ]; do
 	rm ani
 	if [ $FLAGS -eq 4 ] ; then
-		echo "NO OPT, MAVX"
-		gcc -o ani anidado.c -fopenmp -mavx
+		echo "NO OPT, NO MAVX"
+		gcc -o ani anidado.c -fopenmp
 	fi
 	if [ $FLAGS -eq 3 ] ; then
-		echo "NO OPT, NO MAVX"
-		gcc -o ani anidado.c -fopenmp -O3
+		echo "NO OPT, MAVX"
+		gcc -o ani anidado.c -fopenmp -mavx
 	fi
 	if [ $FLAGS -eq 2 ] ; then
 		echo "OPT, NO MAVX"

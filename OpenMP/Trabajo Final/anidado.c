@@ -32,16 +32,25 @@ int main(){
 	matrizB = malloc(TAMANO* sizeof(float*));
 	matrizC = malloc(TAMANO* sizeof(float*));
 
+	if (matrizA==NULL || matrizB==NULL || matrizC==NULL){
+		printf("ERROR ALOCANDO MEMORIA\n");
+		exit(0);
+	}
+
 	//omp_set_num_threads(THREADS);
-	#pragma omp parallel
+	#pragma omp parallel shared(matrizA, matrizB, matrizC) private(i, j, k, ia, ja, ka, imax, kmax, jmax)
 	{
 
 	#pragma omp for
 	for(i = 0; i < TAMANO ; i++){
 		matrizA[i] = malloc(TAMANO*sizeof(float));
 		matrizB[i] = malloc(TAMANO*sizeof(float));
-		//matrizB[i] = calloc(TAMANO, sizeof(float));
 		matrizC[i] = calloc(TAMANO, sizeof(float));
+
+		if (matrizA[i]==NULL || matrizB[i]==NULL || matrizC[i]==NULL){
+			printf("ERROR ALOCANDO MEMORIA\n");
+			exit(0);
+		}
 	}
 
 	/* Inicializo Matrices */
@@ -53,9 +62,8 @@ int main(){
 		matrizB[i][i] = 1;
 	*/
 
-	#pragma omp for simd aligned (matrizC, matrizA, matrizB: 32)
+	#pragma omp for
 	for(i = 0; i<TAMANO; i++){
-		//#pragma omp simd
 		for(j = 0; j<TAMANO; j++){
 			matrizA[i][j] =1;
 			matrizB[i][j] =1;
@@ -79,8 +87,15 @@ int main(){
 		}
 	}
 	*/
+	//simd aligned (matrizC, matrizA, matrizB: 32)
 
-	#pragma omp for simd aligned (matrizC, matrizA, matrizB: 32)
+	/*
+	if(i + TILE_SIZE > TAMANO)
+			imax=TAMANO;
+		else
+			imax=i+TILE_SIZE;
+	*/
+	#pragma omp for
 	for(i = 0; i<TAMANO; i+= TILE_SIZE){
 		imax = i + TILE_SIZE > TAMANO ? TAMANO : i + TILE_SIZE;
 		for(k = 0; k<TAMANO; k+= TILE_SIZE){
@@ -89,7 +104,6 @@ int main(){
 				jmax = j + TILE_SIZE > TAMANO ? TAMANO : j + TILE_SIZE;
 				for(ia=i; ia<imax; ia++){
 					for(ka=k; ka<kmax; ka++){
-						//#pragma omp simd
 						for(ja=j; ja<jmax; ja++){
 							matrizC[ia][ja] += matrizA[ia][ka] * matrizB[ka][ja];
 						}
@@ -101,6 +115,7 @@ int main(){
 
 
 	/* Mostrar Resultados */
+	
 	/*
 	for(i = 0; i<TAMANO; i++){
 		printf("\n");
@@ -108,7 +123,9 @@ int main(){
 			printf("%f    ", matrizC[i][j]);
 		}
 	}
-	*/	
+	*/
+	
+	
 	
 
 
