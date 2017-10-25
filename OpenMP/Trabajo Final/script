@@ -1,14 +1,45 @@
 #!/bin/bash
 # declare STRING variable
-exec &>> your_file.log
+
+#exec &>> your_file.log
 #print variable on a screen
 
 COUNT=5
-echo ""
-echo "Name_of_Test"
-echo "2 threads"
-export OMP_NUM_THREADS=2
-while [ $COUNT -gt 0 ]; do
+COUNT_THREADS=3
+FLAGS=3
+THREADS=2
+echo "Name_of_TestA"
+
+#CON O SIN MAVX
+while [ $FLAGS -gt 0 ]; do
+	rm ani
+	if [ $FLAGS -eq 4 ] ; then
+		echo "NO OPT, MAVX"
+		gcc -o ani anidado.c -fopenmp -mavx
+	fi
+	if [ $FLAGS -eq 3 ] ; then
+		echo "NO OPT, NO MAVX"
+		gcc -o ani anidado.c -fopenmp -O3
+	fi
+	if [ $FLAGS -eq 2 ] ; then
+		echo "OPT, NO MAVX"
+		gcc -o ani anidado.c -fopenmp -O3
+	fi
+	if [ $FLAGS -eq 1 ] ; then
+		echo "OPT, MAVX"
+		gcc -o ani anidado.c -fopenmp -mavx -O3
+	fi
+	#Variable COUNT_THREADS
+	COUNT_THREADS=3
+	THREADS=2
+	while [ $COUNT_THREADS -gt 0 ]; do
+
+		echo "$THREADS threads"
+		export OMP_NUM_THREADS=$THREADS
+
+		#CUENTA DE MUESTRAS POR TEST
+		COUNT=5
+		while [ $COUNT -gt 0 ]; do
 
 	#echo Value of count is: $COUNT
 	./ani
@@ -16,20 +47,12 @@ while [ $COUNT -gt 0 ]; do
 	let COUNT=COUNT-1
 done 
 echo ""
+let THREADS=THREADS*2
+let COUNT_THREADS=COUNT_THREADS-1
+done
 
-COUNT=5
-echo "4 threads"
-export OMP_NUM_THREADS=4
-while [ $COUNT -gt 0 ]; do
-	./ani
-	let COUNT=COUNT-1
-done 
+let FLAGS=FLAGS-1
+done
+
+
 echo ""
-
-COUNT=5
-echo "8 threads"
-export OMP_NUM_THREADS=8
-while [ $COUNT -gt 0 ]; do
-	./ani
-	let COUNT=COUNT-1
-done 

@@ -35,7 +35,7 @@ int main(){
 	//omp_set_num_threads(THREADS);
 	#pragma omp parallel
 	{
-
+		
 	#pragma omp for
 	for(i = 0; i < TAMANO ; i++){
 		matrizA[i] = malloc(TAMANO*sizeof(float));
