@@ -35,7 +35,7 @@ int main(){
 	//omp_set_num_threads(THREADS);
 	#pragma omp parallel
 	{
-		
+
 	#pragma omp for
 	for(i = 0; i < TAMANO ; i++){
 		matrizA[i] = malloc(TAMANO*sizeof(float));
@@ -53,7 +53,7 @@ int main(){
 		matrizB[i][i] = 1;
 	*/
 
-	#pragma omp for simd
+	#pragma omp for simd aligned (matrizC, matrizA, matrizB: 32)
 	for(i = 0; i<TAMANO; i++){
 		//#pragma omp simd
 		for(j = 0; j<TAMANO; j++){
@@ -80,7 +80,7 @@ int main(){
 	}
 	*/
 
-	#pragma omp for simd
+	#pragma omp for simd aligned (matrizC, matrizA, matrizB: 32)
 	for(i = 0; i<TAMANO; i+= TILE_SIZE){
 		imax = i + TILE_SIZE > TAMANO ? TAMANO : i + TILE_SIZE;
 		for(k = 0; k<TAMANO; k+= TILE_SIZE){
