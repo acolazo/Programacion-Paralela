@@ -4,7 +4,7 @@
 
 
 #define THREADS 2
-#define TAMANO 500
+#define TAMANO 250
 #define TILE_SIZE 256
 int main(){
 

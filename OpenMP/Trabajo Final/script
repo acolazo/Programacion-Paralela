@@ -1,32 +1,33 @@
 #!/bin/bash
 # declare STRING variable
 
-exec &>> your_file.log
+#Execute as ./script FILE_TO_EXECUTE TITLE
+exec &>> $2.log
 #print variable on a screen
+
 
 COUNT=5
 COUNT_THREADS=3
 FLAGS=4
 THREADS=2
-echo "Name_of_TestA"
-
+echo "$2"
 #CON O SIN MAVX
 while [ $FLAGS -gt 0 ]; do
 	rm ani
 	if [ $FLAGS -eq 4 ] ; then
-		echo "NO OPT, NO MAVX"
+		echo -ne "NO OPT-NO MAVX";
 		gcc -o ani anidado.c -fopenmp
 	fi
 	if [ $FLAGS -eq 3 ] ; then
-		echo "NO OPT, MAVX"
+		echo -ne "NO OPT-MAVX";
 		gcc -o ani anidado.c -fopenmp -mavx
 	fi
 	if [ $FLAGS -eq 2 ] ; then
-		echo "OPT, NO MAVX"
+		echo -ne "OPT-NO MAVX";
 		gcc -o ani anidado.c -fopenmp -O3
 	fi
 	if [ $FLAGS -eq 1 ] ; then
-		echo "OPT, MAVX"
+		echo -ne "OPT-MAVX";
 		gcc -o ani anidado.c -fopenmp -mavx -O3
 	fi
 	#Variable COUNT_THREADS
@@ -34,7 +35,7 @@ while [ $FLAGS -gt 0 ]; do
 	THREADS=2
 	while [ $COUNT_THREADS -gt 0 ]; do
 
-		echo "$THREADS threads"
+		echo -ne ",$THREADS threads,";
 		export OMP_NUM_THREADS=$THREADS
 
 		#CUENTA DE MUESTRAS POR TEST
@@ -42,7 +43,7 @@ while [ $FLAGS -gt 0 ]; do
 		while [ $COUNT -gt 0 ]; do
 
 	#echo Value of count is: $COUNT
-	./ani
+	./$1
 	#./ani > allout.txt 2>&1
 	let COUNT=COUNT-1
 done 
