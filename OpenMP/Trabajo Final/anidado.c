@@ -3,9 +3,9 @@
 #include <omp.h>
 
 
-#define THREADS 4
-#define TAMANO 2000
-#define TILE_SIZE 512
+#define THREADS 2
+#define TAMANO 500
+#define TILE_SIZE 256
 int main(){
 
 	double start_time = omp_get_wtime();
@@ -32,10 +32,9 @@ int main(){
 	matrizB = malloc(TAMANO* sizeof(float*));
 	matrizC = malloc(TAMANO* sizeof(float*));
 
-	omp_set_num_threads(THREADS);
+	//omp_set_num_threads(THREADS);
 	#pragma omp parallel
 	{
-
 
 	#pragma omp for
 	for(i = 0; i < TAMANO ; i++){
@@ -128,7 +127,13 @@ int main(){
 	
 
 	double time = omp_get_wtime() - start_time;
-	printf("El tiempo de ejecucion es: %lf segundos\n", time);
+	//printf("El tiempo de ejecucion es: %lf segundos\n", time);
+	printf("%lf,", time);
+	/*
+	int aux = THREADS;
+	printf("Number THREADS: %d\n", aux);
+	*/
+	
 
 	return 1;
 }

@@ -1,0 +1,35 @@
+#!/bin/bash
+# declare STRING variable
+exec &>> your_file.log
+#print variable on a screen
+
+COUNT=5
+echo ""
+echo "Name_of_Test"
+echo "2 threads"
+export OMP_NUM_THREADS=2
+while [ $COUNT -gt 0 ]; do
+
+	#echo Value of count is: $COUNT
+	./ani
+	#./ani > allout.txt 2>&1
+	let COUNT=COUNT-1
+done 
+echo ""
+
+COUNT=5
+echo "4 threads"
+export OMP_NUM_THREADS=4
+while [ $COUNT -gt 0 ]; do
+	./ani
+	let COUNT=COUNT-1
+done 
+echo ""
+
+COUNT=5
+echo "8 threads"
+export OMP_NUM_THREADS=8
+while [ $COUNT -gt 0 ]; do
+	./ani
+	let COUNT=COUNT-1
+done 
