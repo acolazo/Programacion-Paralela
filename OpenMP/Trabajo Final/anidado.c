@@ -2,16 +2,28 @@
 #include <stdlib.h>
 #include <omp.h>
 
+/* Execute as ./file TAMANO TILE_SIZE */
 
-#define THREADS 2
-#define TAMANO 250
-#define TILE_SIZE 256
-int main(){
+int main(int argc, char *argv[]){
+
+	int TAMANO;
+	int TILE_SIZE; //256
 
 	double start_time = omp_get_wtime();
 	int i, j, k;
 	int ia, ja, ka;
 	int imax, jmax, kmax;
+	
+	if( argc == 3 ) {
+		sscanf (argv[1],"%d",&TAMANO);	
+		sscanf (argv[2],"%d",&TILE_SIZE);	
+	}
+	else if( argc > 3 ) {
+		exit(0);
+	}
+	else {
+		printf("One argument expected.\n");
+	}
 
 	/* i = filas - j = columnas */
 
@@ -42,16 +54,16 @@ int main(){
 	{
 
 	#pragma omp for
-	for(i = 0; i < TAMANO ; i++){
-		matrizA[i] = malloc(TAMANO*sizeof(float));
-		matrizB[i] = malloc(TAMANO*sizeof(float));
-		matrizC[i] = calloc(TAMANO, sizeof(float));
+		for(i = 0; i < TAMANO ; i++){
+			matrizA[i] = malloc(TAMANO*sizeof(float));
+			matrizB[i] = malloc(TAMANO*sizeof(float));
+			matrizC[i] = calloc(TAMANO, sizeof(float));
 
-		if (matrizA[i]==NULL || matrizB[i]==NULL || matrizC[i]==NULL){
-			printf("ERROR ALOCANDO MEMORIA\n");
-			exit(0);
+			if (matrizA[i]==NULL || matrizB[i]==NULL || matrizC[i]==NULL){
+				printf("ERROR ALOCANDO MEMORIA\n");
+				exit(0);
+			}
 		}
-	}
 
 	/* Inicializo Matrices */
 	/* Row-major order */
@@ -63,12 +75,12 @@ int main(){
 	*/
 
 	#pragma omp for
-	for(i = 0; i<TAMANO; i++){
-		for(j = 0; j<TAMANO; j++){
-			matrizA[i][j] =1;
-			matrizB[i][j] =1;
+		for(i = 0; i<TAMANO; i++){
+			for(j = 0; j<TAMANO; j++){
+				matrizA[i][j] =1;
+				matrizB[i][j] =1;
+			}
 		}
-	}
 
 	/* Hago la Multiplicacion */
 	/* Hay que hacer seis bucles */
@@ -96,26 +108,26 @@ int main(){
 			imax=i+TILE_SIZE;
 	*/
 	#pragma omp for
-	for(i = 0; i<TAMANO; i+= TILE_SIZE){
-		imax = i + TILE_SIZE > TAMANO ? TAMANO : i + TILE_SIZE;
-		for(k = 0; k<TAMANO; k+= TILE_SIZE){
-			kmax = k + TILE_SIZE > TAMANO ? TAMANO : k + TILE_SIZE;
-			for(j = 0; j<TAMANO; j+= TILE_SIZE){
-				jmax = j + TILE_SIZE > TAMANO ? TAMANO : j + TILE_SIZE;
-				for(ia=i; ia<imax; ia++){
-					for(ka=k; ka<kmax; ka++){
-						for(ja=j; ja<jmax; ja++){
-							matrizC[ia][ja] += matrizA[ia][ka] * matrizB[ka][ja];
+		for(i = 0; i<TAMANO; i+= TILE_SIZE){
+			imax = i + TILE_SIZE > TAMANO ? TAMANO : i + TILE_SIZE;
+			for(k = 0; k<TAMANO; k+= TILE_SIZE){
+				kmax = k + TILE_SIZE > TAMANO ? TAMANO : k + TILE_SIZE;
+				for(j = 0; j<TAMANO; j+= TILE_SIZE){
+					jmax = j + TILE_SIZE > TAMANO ? TAMANO : j + TILE_SIZE;
+					for(ia=i; ia<imax; ia++){
+						for(ka=k; ka<kmax; ka++){
+							for(ja=j; ja<jmax; ja++){
+								matrizC[ia][ja] += matrizA[ia][ka] * matrizB[ka][ja];
+							}
 						}
 					}
 				}
 			}
 		}
-	}
 
 
 	/* Mostrar Resultados */
-	
+
 	/*
 	for(i = 0; i<TAMANO; i++){
 		printf("\n");
@@ -124,20 +136,20 @@ int main(){
 		}
 	}
 	*/
-	
-	
-	
+
+
+
 
 
 	/* Libero Memoria */
 	#pragma omp for
-	for(i = 0; i < TAMANO ; i++){
-		free(matrizA[i]);
-		free(matrizB[i]);
-		free(matrizC[i]);
-	}
+		for(i = 0; i < TAMANO ; i++){
+			free(matrizA[i]);
+			free(matrizB[i]);
+			free(matrizC[i]);
+		}
 
-}
+	}
 	free(matrizA);
 	free(matrizB);
 	free(matrizC);
