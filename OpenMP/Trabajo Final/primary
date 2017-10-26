@@ -3,4 +3,12 @@
 script="secondary"
 filename="ani"
 
-./$script $filename 10 256
+arg1=(10 100)
+arg2=(128 256)
+
+
+for i in ${arg1[@]}; do
+	for j in ${arg2[@]}; do
+		./$script $filename $i $j
+	done
+done
