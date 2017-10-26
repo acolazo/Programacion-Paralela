@@ -3,14 +3,25 @@
 #include <omp.h>
 
 
-#define TAMANO 500
-#define CACHE_BLOCK_SIZE 64
-#define TILE_SIZE 256
-int main(){
+int main(int argc, char* argv[]){
+
+	int TAMANO;
+	int TILE_SIZE; //256
 
 	double start_time = omp_get_wtime();
 	int i, j, k, ia, ja, ka, imax, jmax, kmax;
 
+
+	if( argc == 3 ) {
+		sscanf (argv[1],"%d",&TAMANO);	
+		sscanf (argv[2],"%d",&TILE_SIZE);	
+	}
+	else if( argc > 3 ) {
+		exit(0);
+	}
+	else {
+		printf("One argument expected.\n");
+	}
 	/* i = filas - j = columnas */
 
 	/* Alojo Memoria */
@@ -29,10 +40,22 @@ int main(){
 	matrizA = malloc(TAMANO*sizeof(float*));
 	matrizB = calloc(TAMANO, sizeof(float*));
 	matrizC = calloc(TAMANO, sizeof(float*));
+	if (matrizA==NULL || matrizB==NULL || matrizC==NULL){
+		printf("ERROR ALOCANDO MEMORIA\n");
+		exit(0);
+
+	}
+
 	for(i = 0; i < TAMANO ; i++){
 		matrizA[i] = malloc(TAMANO*sizeof(float));
 		matrizB[i] = calloc(TAMANO, sizeof(float));
 		matrizC[i] = calloc(TAMANO, sizeof(float));
+
+		if (matrizA[i]==NULL || matrizB[i]==NULL || matrizC[i]==NULL){
+			printf("ERROR ALOCANDO MEMORIA\n");
+			exit(0);
+		}
+		
 	}
 
 	/* Inicializo Matrices */
@@ -104,7 +127,7 @@ int main(){
 	
 
 	double time = omp_get_wtime() - start_time;
-	printf("El tiempo de ejecucion es: %lf segundos\n", time);
+	printf("%lf,", time);
 
 	return 1;
 }

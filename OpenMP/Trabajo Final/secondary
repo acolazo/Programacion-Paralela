@@ -1,7 +1,8 @@
 #!/bin/bash
 
 #Execute as ./script FILE_TO_EXECUTE ARGUMENT1 ARGUMENT2
-exec &>> $2-$3.log
+rm -rf "$PWD/logs/$2-$3.log"
+exec &>> "$PWD/logs/$2-$3.log"
 #http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_07_03.html
 #print variable on a screen
 
