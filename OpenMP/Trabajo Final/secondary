@@ -8,7 +8,7 @@ exec &>> $2-$3.log
 
 
 
-echo "$2"
+echo "$2-$3"
 
 #Variable Afinidad - Distintas afinidades que se utilizan
 AFINIDAD=2
@@ -74,7 +74,8 @@ while [ $FLAGS -gt 0 ]; do
 			#Start Loop4
 
 	#echo Value of count is: $COUNT
-	./$1
+	./$1 $2 $3
+	#./FILENAME ARGUMENT1 ARGUMENT2
 	#./ani > allout.txt 2>&1
 	let COUNT=COUNT-1
 done 
