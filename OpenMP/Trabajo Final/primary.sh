@@ -3,8 +3,8 @@
 #Scripts
 #secondary
 #secscript
-script="secondary"
-filename="ani"
+script="secondary.sh"
+filename="paralelo"
 
 arg1=(10 100)
 arg2=(128 256)

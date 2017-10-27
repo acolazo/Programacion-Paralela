@@ -64,6 +64,7 @@ int main(int argc, char* argv[]){
 	for(i=0; i<TAMANO; i++)
 		matrizB[i][i] = 1;
 	*/
+	#pragma omp simd
 	for(i = 0; i<TAMANO; i++){
 		for(j = 0; j<TAMANO; j++){
 			matrizA[i][j] =1;
@@ -74,7 +75,7 @@ int main(int argc, char* argv[]){
 	/* Hago la Multiplicacion */
 	/* Hay que hacer seis bucles */
 	
-	/*
+	
 	#pragma omp simd
 	for(i = 0; i<TAMANO; i++){
 		for(k = 0; k<TAMANO; k++){
@@ -83,9 +84,9 @@ int main(int argc, char* argv[]){
 			}
 		}
 	}
-	*/
 	
-	#pragma omp simd
+	
+	/*
 	for(i = 0; i<TAMANO; i+= TILE_SIZE){
 		imax = i + TILE_SIZE > TAMANO ? TAMANO : i + TILE_SIZE;
 		for(k = 0; k<TAMANO; k+= TILE_SIZE){
@@ -102,7 +103,7 @@ int main(int argc, char* argv[]){
 			}
 		}
 	}
-	
+	*/
 
 	/* Mostrar Resultados */
 	/*

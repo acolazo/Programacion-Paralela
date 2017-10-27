@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #Execute as ./script FILE_TO_EXECUTE ARGUMENT1 ARGUMENT2
-rm -rf "$PWD/logs/$2-$3.log"
-exec &>> "$PWD/logs/$2-$3.log"
+rm -rf "$PWD/logs/$2-$3.csv"
+exec &>> "$PWD/logs/$2-$3.csv"
 #http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_07_03.html
 #print variable on a screen
 
@@ -37,22 +37,22 @@ export OMP_PROC_BIND=$binding
 FLAGS=4
 while [ $FLAGS -gt 0 ]; do
 	#Start Loop2
-	rm ani
+	rm -rf $1
 	if [ $FLAGS -eq 4 ] ; then
 		echo -ne ",NO OPT-NO MAVX";
-		gcc -o ani anidado.c -fopenmp
+		gcc -o $1 $1.c -fopenmp
 	fi
 	if [ $FLAGS -eq 3 ] ; then
 		echo -ne ",NO OPT-MAVX";
-		gcc -o ani anidado.c -fopenmp -mavx
+		gcc -o $1 $1.c -fopenmp -mavx
 	fi
 	if [ $FLAGS -eq 2 ] ; then
 		echo -ne ",OPT-NO MAVX";
-		gcc -o ani anidado.c -fopenmp -O3
+		gcc -o $1 $1.c -fopenmp -O3
 	fi
 	if [ $FLAGS -eq 1 ] ; then
 		echo -ne ",OPT-MAVX";
-		gcc -o ani anidado.c -fopenmp -mavx -O3
+		gcc -o $1 $1.c -fopenmp -mavx -O3
 	fi
 	#Variable COUNT_THREADS - Cuantas veces se duplica
 	COUNT_THREADS=3
