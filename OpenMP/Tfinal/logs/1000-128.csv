@@ -1,0 +1,8 @@
+./secondary.sh: line 10: {4},: command not found
+./secondary.sh: line 11: {4},: command not found
+1000-128
+PLACES:cores|BIND:close,NO OPT-NO MAVX,2 threads,6.471447,
+,NO OPT-MAVX,2 threads,5.662291,
+,OPT-NO MAVX,2 threads,0.937814,
+,OPT-MAVX,2 threads,0.415235,
+PLACES:cores|BIND:spread,NO OPT-NO MAVX,2 threads,

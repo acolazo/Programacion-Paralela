@@ -7,12 +7,12 @@ exec &>> "$PWD/logs/$2-$3.csv"
 #print variable on a screen
 
 #VARIABLES PARA MODIFICAR
-custom1="{1}, {4}, {2}, {5}, {3}, {6}, {7}, {10}, {8}, {11}, {9}, {12}"
-custom2="{1}, {4}, {7}, {10}, {2}, {5}, {8}, {11}, {3}, {6}, {9}, {12}"
-CUANTO_VECES_EJECUTO=7
+custom1="{0}, {3}, {1}, {4}, {2}, {5}, {6}, {9}, {7}, {10}, {8}, {11}"
+custom2="{0}, {3}, {6}, {9}, {1}, {4}, {7}, {10}, {2}, {5}, {8}, {11}"
+CUANTO_VECES_EJECUTO=5
 CON_CUANTOS_THREADS_EMPIEZO=2
 CUANTAS_VECES_AUMENTO_THREADS=6
-places=(cores cores threads threads $custom1 $custom2)
+declare -a places=("cores" "cores" "threads" "threads" "$custom1" "$custom2")
 binding=(close spread close false true true)
 
 echo "$2-$3"
@@ -21,15 +21,15 @@ echo "$2-$3"
 
 
 contador=0
-for p in ${places[@]}; do
+for p in "${places[@]}"; do
 
 	echo -ne "PLACES:";
-	echo -ne $p;
+	echo -ne "$p";
 	echo -ne "|BIND:";
 	echo -ne ${binding[contador]};
 
-	export OMP_PLACES=$p
-	export OMP_PROC_BIND=${binding[contador]}
+	export OMP_PLACES="$p"
+	export OMP_PROC_BIND="${binding[contador]}"
 
 #Variable Flags - Distintos Flags que se usan
 FLAGS=4
@@ -53,7 +53,7 @@ while [ $FLAGS -gt 0 ]; do
 		gcc -o $1 $1.c -fopenmp -mavx -O3
 	fi
 	#Variable COUNT_THREADS - Cuantas veces se duplica
-	COUNT_THREADS=$CUANTAS_VECES_DUPLICO_THREADS
+	COUNT_THREADS=$CUANTAS_VECES_AUMENTO_THREADS
 	#Variable Threads - Con cuantos Threads comienza.
 	THREADS=$CON_CUANTOS_THREADS_EMPIEZO
 	FIRST=1
