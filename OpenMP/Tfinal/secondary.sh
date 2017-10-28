@@ -10,10 +10,11 @@ exec &>> "$PWD/logs/$2-$3.csv"
 custom1="{0}, {3}, {1}, {4}, {2}, {5}, {6}, {9}, {7}, {10}, {8}, {11}"
 custom2="{0}, {3}, {6}, {9}, {1}, {4}, {7}, {10}, {2}, {5}, {8}, {11}"
 CUANTO_VECES_EJECUTO=5
-CON_CUANTOS_THREADS_EMPIEZO=2
-CUANTAS_VECES_AUMENTO_THREADS=6
-declare -a places=("cores" "cores" "threads" "threads" "$custom1" "$custom2")
-binding=(close spread close false true true)
+CON_CUANTOS_THREADS_EMPIEZO=4
+CUANTAS_VECES_AUMENTO_THREADS=3
+EN_CUANTO_AUMENTO=4
+declare -a places=("cores" "cores" "threads" "threads")
+binding=(close spread close false)
 
 echo "$2-$3"
 
@@ -81,7 +82,7 @@ done
 #End Loop4
 echo ""
 
-let THREADS=THREADS+2
+let THREADS=THREADS+EN_CUANTO_AUMENTO
 let COUNT_THREADS=COUNT_THREADS-1
 done
 #End Loop 3

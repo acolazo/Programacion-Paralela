@@ -6,7 +6,7 @@
 script="secondary.sh"
 filename="paralelo"
 
-arg1=(1000 2000)
+arg1=(8000)
 arg2=(128 256 512)
 
 
