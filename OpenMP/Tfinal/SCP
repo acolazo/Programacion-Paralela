@@ -6,3 +6,6 @@ scp -r Tfinal acolaz@200.16.19.197:/home/acolaz
 
 perf stat -d ./programa cantidad_de_threads
 nohup ./task &
+
+top -U username
+kill processid
