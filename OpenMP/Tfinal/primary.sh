@@ -7,7 +7,7 @@ script="secondary.sh"
 filename="paralelo"
 
 arg1=(8000)
-arg2=(256 512 1024)
+arg2=(1024 2048 4096)
 
 
 for i in ${arg1[@]}; do

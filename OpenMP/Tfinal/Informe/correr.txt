@@ -1,0 +1,14 @@
+Tengo que correr:
+
+    • Secuencial
+        ? For normal
+        ? For normal con cambio de indices
+        ? Con SIMD
+        ? Sin SIMD
+    • Paralelo
+        ? For normal
+        ? For normal con cambio de indices
+        ? Con SIMD
+        ? Sin SIMD
+
+Tengo que hacer un par de casos mas en cuanto a afinidad.

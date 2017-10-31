@@ -9,14 +9,21 @@ filename=(normal ani simd anisimd)
 echo -ne "Secuencial";
 
 
-arg1=(1000 2000)
-arg2=(128 256 512 1024)
-
+arg1=(1000 2000 4000)
+arg2=(1024 2048 4096)
+simd=0
 
 for f in ${filename[@]}; do
 
 	rm -rf $f
-	gcc -o $f $f.c -fopenmp -mavx -O3
+	if [ "$f" == "simd" ] ; then
+		simd=1
+	fi
+	if [ $simd -eq 0 ] ; then
+		gcc -o $f $f.c -fopenmp -O3
+	else
+		gcc -o $f $f.c -fopenmp -O3 -mavx
+	fi
 	echo "";
 	echo -ne $f;
 	for i in ${arg1[@]}; do
