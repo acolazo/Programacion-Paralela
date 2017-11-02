@@ -6,6 +6,7 @@ exec &>> "$PWD/logs/$2-$3.csv"
 #http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_07_03.html
 #print variable on a screen
 
+#OMP_DISPLAY_ENV=true
 #VARIABLES PARA MODIFICAR
 custom1="{0}, {3}, {1}, {4}, {2}, {5}, {6}, {9}, {7}, {10}, {8}, {11}"
 custom2="{0}, {3}, {6}, {9}, {1}, {4}, {7}, {10}, {2}, {5}, {8}, {11}"
