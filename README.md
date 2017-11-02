@@ -1,2 +1,6 @@
 # Programacion-Paralela
-Trabajos y notas de la materia programacion paralela
+Trabajos y carpetas de la materia programacion paralela.
+
+-OpenMP
+-MPI
+-CUDA
