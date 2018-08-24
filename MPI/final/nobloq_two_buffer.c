@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define RANGE 700
+#define RANGE 4000
 #define PROCS 4
 #define COLS RANGE / 2
 #define ROWS RANGE / 2

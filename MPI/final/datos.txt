@@ -1,0 +1,24 @@
+una pc 8000 679.193184 seconds
+distrbuido bloq
+Results in process 0 were correct and it took 216.769018 seconds
+Results in process 2 were correct and it took 250.002267 seconds
+Results in process 1 were correct and it took 264.820881 seconds
+Results in process 3 were correct and it took 265.099032 seconds
+distribuido no bloq 
+Results in process 0 were correct and it took 220.153004 seconds
+Results in process 2 were correct and it took 248.006552 seconds
+Results in process 1 were correct and it took 250.205375 seconds
+Results in process 3 were correct and it took 379.656669 seconds
+
+
+bloq 12000 
+Results in process 0 were correct and it took 810.434891 seconds
+Results in process 2 were correct and it took 925.372849 seconds
+Results in process 1 were correct and it took 1022.342146 seconds
+Results in process 3 were correct and it took 978.065580 seconds
+
+nobloq 12000
+Results in process 0 were correct and it took 812.111532 seconds
+Results in process 2 were correct and it took 917.752772 seconds
+Results in process 1 were correct and it took 925.973958 seconds
+Results in process 3 were correct and it took 1309.679444 seconds

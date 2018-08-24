@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define RANGE 100
+#define RANGE 8000
+#define NUM_THREADS 4
 #define PROCS 4
 #define COLS RANGE / 2
 #define ROWS RANGE / 2
@@ -68,6 +69,7 @@ void createMetaData(struct metadata *metadata, int taskid)
 int multiplicarMatrices(double *a, double *b, double *c)
 {
   int i, j, k;
+#pragma omp for
   for (i = 0; i < ROWS; i++)
   {
     for (k = 0; k < ROWS; k++)
@@ -312,22 +314,46 @@ int main(int argc, char *argv[])
   double start, end;
   start = MPI_Wtime();
   /* Loop */
-  sendA = sendData(a, metadata.sendto[0], req_send_a, statuss, taskid, &pendingA);
-  recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss, taskid);
-  sendB = sendData(b, metadata.sendto[1], req_send_b, statuss, taskid, &pendingB);
-
-  calculateC1 = multiplicarMatrices(a, b, c);
 
   sendA = sendData(a, metadata.sendto[0], req_send_a, statuss, taskid, &pendingA);
   recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss, taskid);
-  copyA = copyData(bw, a);
-  recvB = receiveData(bw, metadata.receivefrom[1], req_recv, statuss, taskid);
-  recvB = receiveData(bw, metadata.receivefrom[1], req_recv, statuss, taskid);
 
-  calculateC2 = multiplicarMatrices(a, bw, c);
+#pragma omp parallel shared(a, b, c, bw, taskid, statuss, req_send_a, req_send_b, req_recv) num_threads(NUM_THREADS)
+  {
+    //
+    calculateC1 = multiplicarMatrices(a, b, c);
+#pragma omp barrier
+#pragma omp single
+    {
+      sendA = sendData(a, metadata.sendto[0], req_send_a, statuss, taskid, &pendingA);
+      sendB = sendData(b, metadata.sendto[1], req_send_b, statuss, taskid, &pendingB);
+      recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss, taskid);
+      copyA = copyData(bw, a); /* Podria no hacerlo secuencial */
+      recvB = receiveData(bw, metadata.receivefrom[1], req_recv, statuss, taskid);
+      recvB = receiveData(bw, metadata.receivefrom[1], req_recv, statuss, taskid);
+    }
+#pragma omp barrier
+
+    calculateC2 = multiplicarMatrices(a, bw, c);
+
+#pragma omp single
+    {
+      sendB = sendData(b, metadata.sendto[1], req_send_b, statuss, taskid, &pendingB);
+    }
+  }
+
+  /*
+  sendA = sendData(a, metadata.sendto[0], req_send_a, statuss, taskid, &pendingA);
+  sendB = sendData(b, metadata.sendto[1], req_send_b, statuss, taskid, &pendingB);
+  recvB = receiveData(a, metadata.receivefrom[1], req_recv, statuss, taskid);
+  
+  recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss, taskid);
+  recvB = receiveData(a, metadata.receivefrom[1], req_recv, statuss, taskid);
+
+  calculateC2 = multiplicarMatrices(bw, a, c); //bw contiene a A, y a contiene a B.
 
   sendB = sendData(b, metadata.sendto[1], req_send_b, statuss, taskid, &pendingB);
-
+  */
   end = MPI_Wtime();
   /* Check Results */
   if (checkResults(c, OPTION))
