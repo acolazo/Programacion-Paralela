@@ -118,11 +118,18 @@ int multiplicarMatricesPreemptive(double *a, double *b, double *c)
 
 int copyData(double *copyfrom, double *copyto)
 {
+  /*
   int i, j;
   for (i = 0; i < ROWS; i++)
     for (j = 0; j < COLS; j++)
       copyto[i * COLS + j] = copyfrom[i * COLS + j];
+  */
+  double *temp;
 
+  temp = copyfrom;
+  copyfrom = copyto;
+  copyto = copyfrom;
+  
   return 1;
 }
 

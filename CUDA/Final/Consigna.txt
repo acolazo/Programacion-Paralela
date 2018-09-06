@@ -1,0 +1,7 @@
+En la página del curso de la U.Toronto, hay una serie de slides sobre cómo realizar una reducción en forma eficiente en CUDA.
+
+Utilizar los algoritmos allí expuestos para implementar el algoritmo de ordenamiento de selección en forma paralela.
+
+En cada iteración deberá encontrar el mayor valor utilizando la reducción según el curso de Toronto y deberá dejarlo en 
+la última posición del arreglo. Luego deberá llamar recursivamente la función con la longitud del arreglo disminuida en uno, 
+hasta que finalmente quede el arreglo ordenado sobre la placa GPU. Luego deberá devolver a la CPU el arreglo ordenado.

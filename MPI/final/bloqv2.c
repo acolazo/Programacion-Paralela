@@ -122,6 +122,13 @@ int multiplicarMatricesPreemptive(double *a, double *b, double *c)
 
 int copyData(double *copyfrom, double *copyto)
 {
+    double *temp;
+
+    temp=copyfrom;
+    copyfrom = copyto;
+    copyto = copyfrom;
+    return 1;
+    /*
     int i, j;
 //pragma omp for
     for (i = 0; i < ROWS; i++)
@@ -129,6 +136,7 @@ int copyData(double *copyfrom, double *copyto)
             copyto[i * COLS + j] = copyfrom[i * COLS + j];
 
     return 1;
+    */
 }
 
 int checkResults(double *results, int option)
@@ -210,7 +218,7 @@ int sendData(double *ptr, int destination, MPI_Request *req_send, MPI_Status *st
     /* Opcion 2: Enviar matriz B */
 
     //
-    MPI_Send(ptr, ROWS * COLS, MPI_DOUBLE, destination, TAG, MPI_COMM_WORLD);
+    MPI_Ssend(ptr, ROWS * COLS, MPI_DOUBLE, destination, TAG, MPI_COMM_WORLD);
     return 1;
 }
 
