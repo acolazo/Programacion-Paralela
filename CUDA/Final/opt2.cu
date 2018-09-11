@@ -2,9 +2,10 @@
 #include <time.h>
 #include <math.h>
 
-#define SIZE 97
+#define SIZE 26
 #define THREADS 4 //best value = 256
 #define PRINT 1
+#define CHECK 1
 #define DATATYPE struct number
 
 /* Function declarations */
@@ -22,7 +23,8 @@ __global__ void reduceKernel(int size, DATATYPE *g_input, DATATYPE *g_output)
     extern __shared__ DATATYPE sdata[];
 
     unsigned int tid = threadIdx.x;
-    unsigned int gid = (blockIdx.x*blockDim.x) + tid;
+    unsigned int gblock = (blockIdx.x*blockDim.x);
+    unsigned int gid = gblock + tid;
     if(gid < size)
         sdata[tid] = g_input[gid];  
     __syncthreads();
@@ -30,8 +32,10 @@ __global__ void reduceKernel(int size, DATATYPE *g_input, DATATYPE *g_output)
     //do reduction in shared mem
     
     for(unsigned int s=1; s < blockDim.x; s*=2){ //step = s x 2
-        if((tid % (2*s)) == 0 && (gid + s)<size){ //only threadIDs divisible by the step participate
-            sdata[tid] = sdata[tid].value > sdata[tid + s].value ? sdata[tid] : sdata[tid + s];
+        int index = 2 * s * tid;
+        int gindex = index + gblock;
+        if(index < blockDim.x && (gindex + s)<size){
+            sdata[index] = sdata[index].value > sdata[index + s].value ? sdata[index] : sdata[index + s];
         }
         __syncthreads();
     }
@@ -76,12 +80,12 @@ void sortBySelection(int size, DATATYPE *g_list, DATATYPE *g_temp){
     dimBlock.x = threads;
 
     g_input = g_list;
-    printf("Iteracion %d\n", SIZE - size + 1);
+    //printf("Iteracion %d\n", SIZE - size + 1);
     while(dimGrid.x > 0){
         reduceKernel<<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_temp);
 
        
-        printf("Grid: %d, N: %d\n", dimGrid.x, N);
+        //printf("Grid: %d, N: %d\n", dimGrid.x, N);
         
 
         //N = dimGrid.x;
@@ -126,6 +130,25 @@ void printResults(DATATYPE *sorted_list)
     return;
 }
 
+/* Check if results are correct */
+int checkResults(DATATYPE *sorted_list){
+    unsigned int check = 1;
+    for (unsigned int i = 1; i < (SIZE + 1); i++)
+    {
+        if(sorted_list[i-1].value != i)
+            check = 0;
+    }
+
+    if(check)
+        printf("Resultados correctos!\n");
+    else
+        printf("Resultados incorrectos!\n");
+
+    return check;
+    
+}
+
+
 int main(void)
 {
     DATATYPE *list, *list_g, *list_g_o;
@@ -158,6 +181,11 @@ int main(void)
     if (PRINT)
     {
         printResults(list);
+    }
+
+    if(CHECK)
+    {
+        checkResults(list);
     }
 
     cudaFree(list_g);
