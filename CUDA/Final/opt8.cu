@@ -2,7 +2,7 @@
 #include <time.h>
 #include <math.h>
 
-#define SIZE 1 * 1000
+#define SIZE 150 * 1000
 #define maxSharedMemory 49152 //bytes
 #define THREADS 256 //best value = 256
 #define SORT 1
@@ -12,7 +12,7 @@
 #define CHECK 1
 #define DATATYPE struct number
 #define VALUETYPE int
-
+#define RECORDTIME 1
 /* Function declarations */
 void getGridComposition(int, unsigned int*, unsigned int*, unsigned int);
 
@@ -214,7 +214,6 @@ void reduceMax(int size, DATATYPE *g_list, DATATYPE *g_temp, DATATYPE *g_temp_re
             if(dimGrid.x == 1){
                 g_output = g_temp_results + i;
             }
-
             switch(dimBlock.x){
                 case 1024:
                     reduceKernel<1024><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
@@ -250,9 +249,8 @@ void reduceMax(int size, DATATYPE *g_list, DATATYPE *g_temp, DATATYPE *g_temp_re
                     reduceKernel<1><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
             }
-                
             CudaCheckError();
-
+            
             temp = (double) N / (dimBlock.x * 2);
             if (N % (dimBlock.x * 2) != 0) temp++;
             N = temp;
@@ -412,12 +410,39 @@ int main(void)
 
 
     if (SORT){
+        /* Record time */
+        cudaEvent_t start, stop;
+        if(RECORDTIME){
+            cudaEventCreate(&start);
+            cudaEventCreate(&stop);
+            cudaEventRecord(start);
+        }
         sortBySelectionIterative(SIZE, list_g, list_g_o, g_temp_results); /* Segmentation Fault */
-
+        if(RECORDTIME){
+            cudaEventRecord(stop);
+            cudaEventSynchronize(stop);
+            float milliseconds = 0;
+            cudaEventElapsedTime(&milliseconds, start, stop);
+            printf("Pasaron %f milisegundos\n", milliseconds);
+        }
     } 
 
     if (TestReduction){
+        /* Record time */
+        cudaEvent_t start, stop;
+        if(RECORDTIME){
+            cudaEventCreate(&start);
+            cudaEventCreate(&stop);
+            cudaEventRecord(start);
+        }
         reduceMax(SIZE, list_g, list_g_o, g_temp_results);
+        if(RECORDTIME){
+            cudaEventRecord(stop);
+            cudaEventSynchronize(stop);
+            float milliseconds = 0;
+            cudaEventElapsedTime(&milliseconds, start, stop);
+            printf("Pasaron %f milisegundos\n", milliseconds);
+        } 
         //printf("El maximo es %d\n", list[0]);
         //printf("El ultimo de la lista es %d\n", list[SIZE - 1]);
     } 
@@ -425,7 +450,12 @@ int main(void)
     /* Unwrap data into an array of VALUETYPE */
     unwrapKernel<<<dimGrid, dimBlock>>>(SIZE, list_g, list_g_unwrapped );
     CudaSafeCall( cudaMemcpy(list,list_g_unwrapped , SIZE * sizeof(VALUETYPE), cudaMemcpyDeviceToHost) );
+
     /* End of unwrapping data */
+
+    if(TestReduction){
+        printf("El maximo es %d\n", list[0]);
+    }
 
     if (PRINT && SORT)
     {

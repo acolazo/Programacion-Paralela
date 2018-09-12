@@ -325,6 +325,7 @@ int main(int argc, char *argv[])
   sendA = sendData(a, metadata.sendto[0], req_send_a, statuss, taskid, &pendingA);
   recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss, taskid);
 
+
 #pragma omp parallel shared(a, b, c, bw, taskid, statuss, req_send_a, req_send_b, req_recv) num_threads(NUM_THREADS)
   {
     //
