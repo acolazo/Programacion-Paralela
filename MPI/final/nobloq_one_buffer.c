@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define RANGE 8000
+#define MEASURE_PHASES 1
+#define CHECK 1
+#define RANGE 4000
 #define NUM_THREADS 4
 #define PROCS 4
 #define COLS RANGE / 2
@@ -12,6 +14,8 @@
 #define TIMES_TO_INTERRUPT_MULTIPLICATION 4
 #define ROUNDS ROWS / TIMES_TO_INTERRUPT_MULTIPLICATION
 #define OPTION 2
+/* Opcion 1: Matriz A y B estan rellenas de 1's */
+/* Opcion 2: Matriz A esta rellena de 5's. Matriz B es la matriz identidad. */
 #define MATRIX_VALUE_OPTION_2 5
 #define PRINT_RESULTS 0
 
@@ -129,7 +133,7 @@ int copyData(double *copyfrom, double *copyto)
   temp = copyfrom;
   copyfrom = copyto;
   copyto = copyfrom;
-  
+
   return 1;
 }
 
@@ -264,7 +268,8 @@ int main(int argc, char *argv[])
   MPI_Request req_send_a[PROCS];
   MPI_Request req_send_b[PROCS];
   MPI_Request req_recv[PROCS];
-  MPI_Status statuss[PROCS];
+  MPI_Status statuss_r[PROCS];
+  MPI_Status statuss_s[PROCS];
 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
@@ -319,26 +324,52 @@ int main(int argc, char *argv[])
   int pendingB = 0;
 
   double start, end;
+  double start1, end1, start2, end2, start3, end3, start2a, end2a;
   start = MPI_Wtime();
+  start1 = MPI_Wtime();
   /* Loop */
 
-  sendA = sendData(a, metadata.sendto[0], req_send_a, statuss, taskid, &pendingA);
-  recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss, taskid);
+  sendA = sendData(a, metadata.sendto[0], req_send_a, statuss_s, taskid, &pendingA);
+  recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss_r, taskid);
 
-
-#pragma omp parallel shared(a, b, c, bw, taskid, statuss, req_send_a, req_send_b, req_recv) num_threads(NUM_THREADS)
+#pragma omp parallel shared(a, b, c, bw, taskid, statuss_r, statuss_s, req_send_a, req_send_b, req_recv) num_threads(NUM_THREADS)
   {
-    //
     calculateC1 = multiplicarMatrices(a, b, c);
 #pragma omp barrier
 #pragma omp single
     {
-      sendA = sendData(a, metadata.sendto[0], req_send_a, statuss, taskid, &pendingA);
-      sendB = sendData(b, metadata.sendto[1], req_send_b, statuss, taskid, &pendingB);
-      recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss, taskid);
+      end1 = MPI_Wtime();
+      start2 = MPI_Wtime();
+
+      sendA = sendData(a, metadata.sendto[0], req_send_a, statuss_s, taskid, &pendingA);
+      sendB = sendData(b, metadata.sendto[1], req_send_b, statuss_s, taskid, &pendingB);
+      recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss_r, taskid);
       copyA = copyData(bw, a); /* Podria no hacerlo secuencial */
-      recvB = receiveData(bw, metadata.receivefrom[1], req_recv, statuss, taskid);
-      recvB = receiveData(bw, metadata.receivefrom[1], req_recv, statuss, taskid);
+      end2 = MPI_Wtime();
+      start2a = MPI_Wtime();
+      /* New */
+      /*
+      if (taskid == 0 || taskid == 3)
+      {
+        MPI_Send(b, ROWS * COLS, MPI_DOUBLE, metadata.sendto[1], TAG, MPI_COMM_WORLD);
+        MPI_Recv(bw, ROWS * COLS, MPI_DOUBLE, metadata.receivefrom[1], TAG, MPI_COMM_WORLD, statuss + taskid);
+      }
+      else
+      {
+        MPI_Recv(bw, ROWS * COLS, MPI_DOUBLE, metadata.receivefrom[1], TAG, MPI_COMM_WORLD, statuss + taskid);
+        MPI_Send(b, ROWS * COLS, MPI_DOUBLE, metadata.sendto[1], TAG, MPI_COMM_WORLD);
+      }
+      */
+      //MPI_Sendrecv (b,ROWS*COLS,MPI_DOUBLE,metadata.sendto[1],TAG, bw,ROWS*COLS,MPI_DOUBLE,metadata.receivefrom[1],TAG,MPI_COMM_WORLD,statuss + taskid);
+      /* End New */
+
+      recvB = receiveData(bw, metadata.receivefrom[1], req_recv, statuss_r, taskid);
+      //sendB = sendData(b, metadata.sendto[1], req_send_b, statuss_s, taskid, &pendingB);
+      recvB = receiveData(bw, metadata.receivefrom[1], req_recv, statuss_r, taskid);
+      //end2 = MPI_Wtime();
+      sendB = sendData(b, metadata.sendto[1], req_send_b, statuss_s, taskid, &pendingB);
+      end2a = MPI_Wtime();
+      start3 = MPI_Wtime();
     }
 #pragma omp barrier
 
@@ -346,7 +377,7 @@ int main(int argc, char *argv[])
 
 #pragma omp single
     {
-      sendB = sendData(b, metadata.sendto[1], req_send_b, statuss, taskid, &pendingB);
+      end3 = MPI_Wtime();
     }
   }
 
@@ -364,13 +395,21 @@ int main(int argc, char *argv[])
   */
   end = MPI_Wtime();
   /* Check Results */
-  if (checkResults(c, OPTION))
+  if (CHECK && checkResults(c, OPTION))
   {
     printf("Results in process %d were correct and it took %f seconds\n", taskid, end - start);
   }
-  else
+  else if (CHECK)
   {
     printf("Results in process %d were incorrect\n", taskid);
+  }
+
+  if (MEASURE_PHASES)
+  {
+    printf("Process %d took %f seconds in phase 1\n", taskid, end1 - start1);
+    printf("Process %d took %f seconds in phase 2\n", taskid, end2 - start2);
+    printf("Process %d took %f seconds in phase 2a\n", taskid, end2a - start2a);
+    printf("Process %d took %f seconds in phase 3\n", taskid, end3 - start3);
   }
 
   /* Print Results */

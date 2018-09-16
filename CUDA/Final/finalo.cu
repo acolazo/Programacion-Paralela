@@ -2,12 +2,12 @@
 #include <time.h>
 #include <math.h>
 
-#define SIZE 8 * 1000
+#define SIZE 150 * 1000
 #define maxSharedMemory 49152 //bytes
 #define THREADS 256 //best value = 256
-#define SORT 0
-#define TestReduction 1
-#define PRINT 1
+#define SORT 1
+#define TestReduction 0
+#define PRINT 0
 #define printErrors 0
 #define CHECK 1
 #define DATATYPE struct number
@@ -15,6 +15,14 @@
 #define RECORDTIME 1
 
 #define OPTION 2
+/*
+1: i+1 
+2: SIZE-i
+3: rand() % 100
+*/
+
+//#define CUDA_ERROR_CHECK
+
 /* Function declarations */
 void getGridComposition(int, unsigned int*, unsigned int*, unsigned int);
 
@@ -25,7 +33,7 @@ struct number{
 };
 
 /* Error Checking */
-//#define CUDA_ERROR_CHECK
+
 
 #define CudaSafeCall( err ) __cudaSafeCall(err, __FILE__, __LINE__)
 #define CudaCheckError() __cudaCheckError( __FILE__, __LINE__ )
@@ -183,7 +191,7 @@ int reduceMax(int size, DATATYPE *g_list, DATATYPE *g_temp, DATATYPE *g_temp_res
     int static counter = 0;
     unsigned int threads, blocks;
     DATATYPE *g_input, *g_output, *g_iteration_list;
-    int N, iterations, maxAllowedSize, CONST_N;
+    int N, iterations, maxAllowedSize, CONST_N, maxLoadToShared;
     double temp;
     dim3 dimGrid(1, 1, 1);
     dim3 dimBlock(1, 1, 1);
@@ -193,7 +201,8 @@ int reduceMax(int size, DATATYPE *g_list, DATATYPE *g_temp, DATATYPE *g_temp_res
     /* Check if we can do one kernel call or more */
     iterations = 1;
     CONST_N = size;
-    maxAllowedSize = maxSharedMemory / sizeof(DATATYPE);
+    maxLoadToShared = maxSharedMemory / sizeof(DATATYPE);
+    maxAllowedSize = maxLoadToShared * 2;
 
     while(CONST_N > maxAllowedSize ){
        CONST_N -= maxAllowedSize;
@@ -212,45 +221,49 @@ int reduceMax(int size, DATATYPE *g_list, DATATYPE *g_temp, DATATYPE *g_temp_res
 
         g_output = g_temp;
         /* Perform the reduction for N elements */
-        counter++;
+        
         while(dimGrid.x > 0){
 
             if(dimGrid.x == 1){
                 g_output = g_temp_results + i;
             }
+
+            //printf("Bloque: %d, Threads: %d, N: %d \n", dimGrid.x, dimBlock.x, N);
+            counter++;
+            
             switch(dimBlock.x){
                 case 1024:
-                    reduceKernel<1024><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<1024><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
                 case 512:
-                    reduceKernel<512><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<512><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
                 case 256:
-                    reduceKernel<256><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<256><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
                 case 128:
-                    reduceKernel<128><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<128><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
                 case 64:
-                    reduceKernel<64><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<64><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
                 case 32:
-                    reduceKernel<32><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<32><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;  
                 case 16:
-                    reduceKernel<16><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<16><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
                 case 8:
-                    reduceKernel<8><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<8><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
                 case 4:
-                    reduceKernel<4><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<4><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
                 case 2:
-                    reduceKernel<2><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<2><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
                 case 1:
-                    reduceKernel<1><<<dimGrid, dimBlock, N * sizeof(DATATYPE)>>>(N, g_input, g_output);
+                    reduceKernel<1><<<dimGrid, dimBlock, maxLoadToShared * sizeof(DATATYPE)>>>(N, g_input, g_output);
                     break;
             }
             CudaCheckError();
@@ -259,13 +272,13 @@ int reduceMax(int size, DATATYPE *g_list, DATATYPE *g_temp, DATATYPE *g_temp_res
             if (N % (dimBlock.x * 2) != 0) temp++;
             N = temp;
 
-            dimGrid.x = (dimGrid.x > (dimBlock.x * 2)) || (dimGrid.x == 1) ? (dimGrid.x / (dimBlock.x * 2)) : 1;
+            dimGrid.x = (dimGrid.x > (dimBlock.x * 2)) || (dimGrid.x == 1) ? (dimGrid.x / (dimBlock.x * 2)) : 1; /* Revisar */
 
             g_input = g_temp;
         }
 
-        g_iteration_list += CONST_N;
-        CONST_N = maxAllowedSize;
+        g_iteration_list += CONST_N; /* Revisar */
+        CONST_N = maxAllowedSize; /* Revisar */
     }
 
    
@@ -316,12 +329,13 @@ void getGridComposition(int size, unsigned int* blocks, unsigned int* threads, u
         *blocks<<=1;
     }
 
-    
+    /*
     if(*blocks == 1){
         while( ( *threads * data_per_thread / 2 ) > size && (*threads > 1)){
             *threads >>=1;
         }
     }
+    */
     
 
     return;

@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define RANGE 8000
+#define MEASURE_PHASES 1
+#define CHECK 1
+#define RANGE 4000
 #define NUM_THREADS 4
 #define PROCS 4
 #define COLS RANGE / 2
@@ -12,6 +14,8 @@
 #define TIMES_TO_INTERRUPT_MULTIPLICATION 4
 #define ROUNDS ROWS / TIMES_TO_INTERRUPT_MULTIPLICATION
 #define OPTION 2
+/* Opcion 1: Matriz A y B estan rellenas de 1's */
+/* Opcion 2: Matriz A esta rellena de 5's. Matriz B es la matriz identidad. */
 #define MATRIX_VALUE_OPTION_2 5
 #define PRINT_RESULTS 0
 
@@ -124,7 +128,7 @@ int copyData(double *copyfrom, double *copyto)
 {
     double *temp;
 
-    temp=copyfrom;
+    temp = copyfrom;
     copyfrom = copyto;
     copyto = copyfrom;
     return 1;
@@ -302,18 +306,20 @@ int main(int argc, char *argv[])
     int pendingB = 0;
 
     double start, end;
-    double starte, ende;
+    double start1, end1, start2, end2, start3, end3, start2a, end2a;
 
     start = MPI_Wtime();
-//MPI_Send(ptr, ROWS * COLS, MPI_DOUBLE, metadata.sendto[k], 1, MPI_COMM_WORLD);
-//MPI_Recv(ptr, ROWS * COLS, MPI_DOUBLE, metadata.receivefrom[k], 1, MPI_COMM_WORLD, &status);
-/* Loop */
+    start1 = MPI_Wtime();
+    /* Loop */
+
 #pragma omp parallel shared(a, b, c, bw, taskid, statuss, req_send_a, req_send_b, req_recv) num_threads(NUM_THREADS)
     {
         calculateC1 = multiplicarMatrices(a, b, c);
-//starte = MPI_Wtime();
+
 #pragma omp single
         {
+            end1 = MPI_Wtime();
+            start2 = MPI_Wtime();
             if (metadata.sender)
             {
                 MPI_Send(a, ROWS * COLS, MPI_DOUBLE, metadata.sendto[0], TAG, MPI_COMM_WORLD);
@@ -324,8 +330,11 @@ int main(int argc, char *argv[])
                 MPI_Recv(bw, ROWS * COLS, MPI_DOUBLE, metadata.receivefrom[0], TAG, MPI_COMM_WORLD, statuss + taskid);
                 MPI_Send(a, ROWS * COLS, MPI_DOUBLE, metadata.sendto[0], TAG, MPI_COMM_WORLD);
             }
-//pragma omp barrier
-        copyA = copyData(bw, a);
+            
+            //pragma omp barrier
+            copyA = copyData(bw, a);
+            end2 = MPI_Wtime();
+            start2a = MPI_Wtime();
         }
 #pragma omp barrier
 
@@ -341,19 +350,32 @@ int main(int argc, char *argv[])
                 MPI_Recv(bw, ROWS * COLS, MPI_DOUBLE, metadata.receivefrom[1], TAG, MPI_COMM_WORLD, statuss + taskid);
                 MPI_Send(b, ROWS * COLS, MPI_DOUBLE, metadata.sendto[1], TAG, MPI_COMM_WORLD);
             }
+            //end2 = MPI_Wtime();
+            end2a = MPI_Wtime();
+            start3 = MPI_Wtime();
         }
+
 #pragma omp barrier
         calculateC2 = multiplicarMatrices(a, bw, c);
     }
+    end3 = MPI_Wtime();
     end = MPI_Wtime();
     /* Check Results */
-    if (checkResults(c, OPTION))
+    if (CHECK && checkResults(c, OPTION))
     {
         printf("Results in process %d were correct and it took %f seconds\n", taskid, end - start);
     }
-    else
+    else if (CHECK)
     {
         printf("Results in process %d were incorrect\n", taskid);
+    }
+
+    if (MEASURE_PHASES)
+    {
+        printf("Process %d took %f seconds in phase 1\n", taskid, end1 - start1);
+        printf("Process %d took %f seconds in phase 2\n", taskid, end2 - start2);
+        printf("Process %d took %f seconds in phase 2a\n", taskid, end2a - start2a);
+        printf("Process %d took %f seconds in phase 3\n", taskid, end3 - start3);
     }
 
     /* Print Results */
