@@ -2,12 +2,12 @@
 #include <time.h>
 #include <math.h>
 
-#define SIZE 150 * 1000
+#define SIZE 1
 #define maxSharedMemory 49152 //bytes per block
 #define THREADS 256 //best value = 256
 
-#define SORT 0
-#define TestReduction 1
+#define SORT 1
+#define TestReduction 0
 #define PRINT 0
 #define printErrors 0
 #define CHECK 1
@@ -16,9 +16,9 @@
 #define VALUETYPE int
 #define MINVALUE INT_MIN
 
-#define PRINTINFO 1
+#define PRINTINFO 0
 
-#define OPTION 1
+#define OPTION 2
 /*
 1: i+1 
 2: SIZE-i
@@ -98,7 +98,6 @@ __global__ void reduceKernel(int size, DATATYPE *g_input, DATATYPE *g_output)
     else if (i<size){
         sdata[tid] = g_input[i];
     }
-    
     else{
         DATATYPE min_value;
         min_value.value = MINVALUE;
@@ -139,6 +138,7 @@ __global__ void reduceKernel(int size, DATATYPE *g_input, DATATYPE *g_output)
     if(tid < 32){
         warpReduce<blockSize>(sdata, tid, i, size);
     }
+    
 
     //write result for this block to global mem
     if (tid == 0) g_output[blockIdx.x] = sdata[tid];   
@@ -193,142 +193,100 @@ __global__ void unwrapKernel(int size, DATATYPE *g_wrapped_list, VALUETYPE * g_l
 
 
 /* Wraps Reduction Kernel Call */
-int reduceMax(int size, DATATYPE *g_list, DATATYPE *g_temp, DATATYPE *g_temp_results){
-    static int counter = 0;
+DATATYPE * reduceMax(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE *g_wb){
     unsigned int threads, blocks;
-    DATATYPE *g_input, *g_output, *g_iteration_list;
-    int N, iterations, maxAllowedSize, CONST_N;
-    unsigned int maxLoadToShared, A;
-    double temp;
+    DATATYPE *input, *output;
+
+    int N, temp, A;
     dim3 dimGrid(1, 1, 1);
     dim3 dimBlock(1, 1, 1);
-    
 
-    g_iteration_list = g_list;
-    /* Check if we can do one kernel call or more */
-    iterations = 1;
-    CONST_N = size;
+    getGridComposition(size, &blocks, &threads, 2);
+    dimGrid.x = blocks;
+    dimBlock.x = threads;
+    A = threads;
+    A = A < 64 ? 64 : A;
+    N = size;
 
-    maxLoadToShared = 1;
-    while(maxLoadToShared * 2 * sizeof(DATATYPE) < maxSharedMemory)
-        maxLoadToShared<<=1;
+    input = g_list;
+    output = g_wa;
+    int condition = 1;
+    while (dimGrid.x > 0)
+    {
+        if (PRINTINFO) printf("N: %d, Blocks: %d, Threads: %d, Share: %d\n", N, blocks, threads, A);
 
+        switch(dimBlock.x){
+            case 1024:
+                reduceKernel<1024><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input, output);
+                break;
+            case 512:
+                reduceKernel<512><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input, output);
+                break;
+            case 256:
+                reduceKernel<256><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input, output);
+                break;
+            case 128:
+                reduceKernel<128><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input,output);
+                break;
+            case 64:
+                reduceKernel<64><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input, output);
+                break;
+            case 32:
+                reduceKernel<32><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input, output);
+                break;  
+            case 16:
+                reduceKernel<16><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input, output);
+                break;
+            case 8:
+                reduceKernel<8><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input, output);
+                break;
+            case 4:
+                reduceKernel<4><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input,output);
+                break;
+            case 2:
+                reduceKernel<2><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input, output);
+                break;
+            case 1:
+                reduceKernel<1><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, input, output);
+                break;
+        }
+        CudaCheckError();
 
-
-    maxAllowedSize = maxLoadToShared * 2;
-
-    while(CONST_N > maxAllowedSize ){
-       CONST_N -= maxAllowedSize;
-       iterations++;
-    }
-    
-    for(int i = 0; i < iterations; i++){
-        /* Get Grid Composition */
-        g_input = g_iteration_list;
-        N = CONST_N;
-        getGridComposition(N, &blocks, &threads, 2);
-        dimGrid.x = blocks;
-        dimBlock.x = threads;
-
-        //printf("N: %d, Blocks: %d, Threads: %d\n", N, blocks, threads);
-
-        g_output = g_temp;
-
-        /* Perform the reduction for N elements */
-        while(dimGrid.x > 0){
-            /* */
-            A = THREADS;
-            //A = dimBlock.x * dimGrid.x;
-            /* */
-
-            if (PRINTINFO) printf("N: %d, Blocks: %d, Threads: %d, Share: %d\n", N, blocks, threads, A);
-            
-
-            if(dimGrid.x == 1){
-                g_output = g_temp_results + i;
-            }
-            counter++;
-            switch(dimBlock.x){
-                case 1024:
-                    reduceKernel<1024><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;
-                case 512:
-                    reduceKernel<512><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;
-                case 256:
-                    reduceKernel<256><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;
-                case 128:
-                    reduceKernel<128><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;
-                case 64:
-                    reduceKernel<64><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;
-                case 32:
-                    reduceKernel<32><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;  
-                case 16:
-                    reduceKernel<16><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;
-                case 8:
-                    reduceKernel<8><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;
-                case 4:
-                    reduceKernel<4><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;
-                case 2:
-                    reduceKernel<2><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;
-                case 1:
-                    reduceKernel<1><<<dimGrid, dimBlock, A * sizeof(DATATYPE)>>>(N, g_input, g_output);
-                    break;
-            }
-            CudaCheckError();
-            
-            temp = (double) N / (dimBlock.x * 2);
-            if (N % (dimBlock.x * 2) != 0) temp++;
-            N = temp;
-
-            dimGrid.x = (dimGrid.x > (dimBlock.x * 2)) || (dimGrid.x == 1) ? (dimGrid.x / (dimBlock.x * 2)) : 1;
-
-            g_input = g_temp;
+        temp = (N / (dimBlock.x * 2));
+        if (N % (dimBlock.x * 2) != 0)
+            temp++;
+        N = temp;
+        
+        if(condition){
+            input = g_wa;
+            output = g_wb;
+            condition = 0;
+        }
+        else{
+            input = g_wb;
+            output = g_wa;
+            condition = 1;
         }
 
-        g_iteration_list += CONST_N;
-        CONST_N = maxAllowedSize;
+        if(dimGrid.x == 1) dimGrid.x = 0;
+        else {
+            getGridComposition(N, &blocks, &threads, 2);
+            dimGrid.x = blocks;
+            dimBlock.x = threads;
+        }
     }
 
-   
-    /* Recursive call to reduce Wrapper */
-    if(iterations > 1){
-        reduceMax(iterations, g_temp_results, g_temp, g_temp_results);
-    }
-    
-
-    return counter;
-}
-
-
-/* Calls the reduction wrapper and sorts the max results */
-void sortBySelection(int size, DATATYPE *g_list, DATATYPE *g_temp, DATATYPE * g_temp_results, VALUETYPE * g_results){
-    reduceMax(size, g_list, g_temp, g_temp_results);
-
-    swapKernel<<<1, 1>>>(size, g_list, g_temp_results, g_results);
-
-    if(size > 2){
-        sortBySelection(size-1, g_list, g_temp, g_temp_results, g_results);
-    }
-    
-
-    return;
+    return input; /* At this point input is the last output */
 }
 
 /* Calls the iterative reduction wrapper and sorts the max results */
-void sortBySelectionIterative(int size, DATATYPE *g_list, DATATYPE *g_temp, DATATYPE * g_temp_results, VALUETYPE * g_results){
+void sortBySelectionIterative(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE * g_wb, VALUETYPE * g_results){
 
+    DATATYPE * max;
     for(int i = size; i > 0; i--){
-        reduceMax(i, g_list, g_temp, g_temp_results);
-        swapKernel<<<1, 1>>>(i, g_list, g_temp_results, g_results);
+        max = reduceMax(i, g_list, g_wa, g_wb);
+        swapKernel<<<1, 1>>>(i, g_list, max, g_results);
+        CudaCheckError();
     }
 
     
@@ -346,15 +304,12 @@ void getGridComposition(int size, unsigned int* blocks, unsigned int* threads, u
         *blocks<<=1;
     }
 
-    
-    /*
     if(*blocks == 1){
-        while( ( *threads * data_per_thread / 2 ) > size && (*threads > 1)){
-            *threads >>=1;
-        }
+        while( *threads >= size * 2 / data_per_thread )
+            *threads >>= 1;
+
+        if (*threads == 0) *threads = 1;
     }
-    */
-    
 
     return;
 }
@@ -399,9 +354,9 @@ int checkResults(VALUETYPE *sorted_list){
 
 int main(void)
 {
-    DATATYPE *list_g, *list_g_o, *g_temp_results;
-    VALUETYPE *list, *list_g_unwrapped;
-    int allocate_exceded_share_mem;
+    DATATYPE *g_list, *g_wa, *g_wb;
+    VALUETYPE *list, *g_unwrapped;
+    int allocate;
     srand(time(NULL));
 
     /* Allocate Host memory */
@@ -412,17 +367,17 @@ int main(void)
     }
 
     /* Allocate device memory */
-    CudaSafeCall( cudaMalloc((void**)&list_g_unwrapped, SIZE * sizeof(VALUETYPE)) );
-    CudaSafeCall( cudaMalloc((void**)&list_g, SIZE * sizeof(DATATYPE)) );
-    CudaSafeCall( cudaMalloc((void**)&list_g_o, maxSharedMemory / THREADS ) );
+    CudaSafeCall( cudaMalloc((void**)&g_unwrapped, SIZE * sizeof(VALUETYPE)) );
+    CudaSafeCall( cudaMalloc((void**)&g_list, SIZE * sizeof(DATATYPE)) );
 
-    allocate_exceded_share_mem = 1;
-    for(int i = (SIZE * sizeof(DATATYPE)); i > maxSharedMemory; i-=maxSharedMemory)
-        allocate_exceded_share_mem++;
+    allocate = 1;
+    while (allocate < SIZE || allocate < THREADS)
+        allocate <<= 1;
+    
+    CudaSafeCall( cudaMalloc((void**)&g_wa, allocate / THREADS * sizeof(DATATYPE)) );
+    CudaSafeCall( cudaMalloc((void**)&g_wb, allocate / THREADS * sizeof(DATATYPE)) );
 
-    CudaSafeCall (cudaMalloc((void**)&g_temp_results, allocate_exceded_share_mem * sizeof(DATATYPE)) );
-
-    /* Initialize data */
+    if (PRINTINFO) printf("Allocate: %d, Max Threads: %d\n", allocate, THREADS);
    /* Initialize data */
    for (int i = 0; i < SIZE; i++)
    {   
@@ -438,19 +393,19 @@ int main(void)
            break;
        }        
    }
-
+   /* End of initializing data */
     /* Wrap Data into a struct with index for sorting */
     unsigned int threads, blocks;
     dim3 dimGrid(1, 1, 1);
     dim3 dimBlock(1, 1, 1);
 
-    CudaSafeCall( cudaMemcpy(list_g_unwrapped, list, SIZE * sizeof(VALUETYPE), cudaMemcpyHostToDevice) );
+    CudaSafeCall( cudaMemcpy(g_unwrapped, list, SIZE * sizeof(VALUETYPE), cudaMemcpyHostToDevice) );
 
     getGridComposition(SIZE, &blocks, &threads, 1);
     dimGrid.x = blocks;
     dimBlock.x = threads;
-
-    wrapKernel<<<dimGrid, dimBlock>>>(SIZE, list_g, list_g_unwrapped );
+    
+    wrapKernel<<<dimGrid, dimBlock>>>(SIZE, g_list, g_unwrapped );
     /* End of wrapping data */
 
 
@@ -462,7 +417,7 @@ int main(void)
             cudaEventCreate(&stop);
             cudaEventRecord(start);
         }
-        sortBySelectionIterative(SIZE, list_g, list_g_o, g_temp_results, list_g_unwrapped);
+        sortBySelectionIterative(SIZE, g_list, g_wa, g_wb, g_unwrapped);
         if(RECORDTIME){
             cudaEventRecord(stop);
             cudaEventSynchronize(stop);
@@ -470,19 +425,19 @@ int main(void)
             cudaEventElapsedTime(&milliseconds, start, stop);
             printf("Pasaron %f milisegundos\n", milliseconds);
         }
-        CudaSafeCall( cudaMemcpy(list,list_g_unwrapped , SIZE * sizeof(VALUETYPE), cudaMemcpyDeviceToHost) );
+        CudaSafeCall( cudaMemcpy(list,g_unwrapped , SIZE * sizeof(VALUETYPE), cudaMemcpyDeviceToHost) );
     } 
 
     if (TestReduction){
         /* Record time */
-        int contador;
+        DATATYPE * result;
         cudaEvent_t start, stop;
         if(RECORDTIME){
             cudaEventCreate(&start);
             cudaEventCreate(&stop);
             cudaEventRecord(start);
         }
-        contador = reduceMax(SIZE, list_g, list_g_o, g_temp_results);
+        result = reduceMax(SIZE, g_list, g_wa, g_wb);
         if(RECORDTIME){
             cudaEventRecord(stop);
             cudaEventSynchronize(stop);
@@ -490,16 +445,10 @@ int main(void)
             cudaEventElapsedTime(&milliseconds, start, stop);
             printf("Pasaron %f milisegundos\n", milliseconds);
         } 
-        unwrapKernel<<<1, 1>>>(1, g_temp_results, list_g_unwrapped );
-        printf("Entro %d veces a la funcion de kernel\n", contador);
-        CudaSafeCall( cudaMemcpy(list,list_g_unwrapped , 1 * sizeof(VALUETYPE), cudaMemcpyDeviceToHost) );
+        unwrapKernel<<<1, 1>>>(1, result, g_unwrapped );
+        CudaSafeCall( cudaMemcpy(list,g_unwrapped , 1 * sizeof(VALUETYPE), cudaMemcpyDeviceToHost) );
 
     } 
-    
-    /* Unwrap data into an array of VALUETYPE */
-    // unwrapKernel<<<dimGrid, dimBlock>>>(SIZE, list_g, list_g_unwrapped );
-
-    /* End of unwrapping data */
 
     if(TestReduction){
         printf("El maximo es %d\n", list[0]);
@@ -514,11 +463,9 @@ int main(void)
         checkResults(list);
     }
 
-    printf("Allocated Exceded Mem: %d\n", allocate_exceded_share_mem);
-
-    CudaSafeCall ( cudaFree(g_temp_results) );
-    CudaSafeCall ( cudaFree(list_g) );
-    CudaSafeCall ( cudaFree(list_g_o) );
-    CudaSafeCall ( cudaFree(list_g_unwrapped) );
+    CudaSafeCall ( cudaFree(g_wa) );
+    CudaSafeCall ( cudaFree(g_wb) );
+    CudaSafeCall ( cudaFree(g_list) );
+    CudaSafeCall ( cudaFree(g_unwrapped) );
     free(list);
 }

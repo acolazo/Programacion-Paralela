@@ -2,18 +2,18 @@
 #include <time.h>
 #include <math.h>
 
-#define SIZE 10 * 1
-
+#define SIZE 150 * 1000
 #define THREADS 256 //best value = 256
 
-#define SORT 0
-#define TestReduction 1
+#define SORT 1
+#define TestReduction 0
 #define PRINT 0
 #define printErrors 0
 #define CHECK 1
 #define DATATYPE int
 #define RECORDTIME 1
 #define MIN INT_MIN
+#define PRINTINFO 0
 
 #define OPTION 1
 /*
@@ -22,7 +22,7 @@
 3: rand() % 100
 */
 
-//#define CUDA_ERROR_CHECK
+#define CUDA_ERROR_CHECK
 
 /* Function declarations */
 void getGridComposition(int, unsigned int *, unsigned int *, unsigned int);
@@ -96,12 +96,11 @@ __global__ void reduceWithIndexKernel(int size, DATATYPE * g_list, int * g_inidx
 __global__ void reduceKernel(int size, DATATYPE * g_list, int * g_inidx, int * g_outidx)
 {
     unsigned int tid = threadIdx.x;
-    unsigned int gid = (blockIdx.x * blockDim.x) + tid;
+    unsigned int gid = (blockIdx.x * blockDim.x * 2) + tid;
 
-    unsigned int s = blockDim.x / 2;
-    if (tid < s) g_inidx[gid] = g_list[gid] > g_list[gid + s] ? gid : gid + s;
+    g_inidx[gid] = g_list[gid] > g_list[gid + blockDim.x] ? gid : gid + blockDim.x;
 
-    for (s >>= 1; s > 0; s >>= 1)
+    for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1)
     {
         if (tid < s)
         {
@@ -115,10 +114,21 @@ __global__ void reduceKernel(int size, DATATYPE * g_list, int * g_inidx, int * g
 }
 
 /* This function swaps the MAX element [which should be in position 0] with the last element of the list */
+/* Also it will save the max in determined position in g_sorted_list */
 /* WARNING: This function must be called by only one block */
-__global__ void swapKernel(int size, DATATYPE *g_list, DATATYPE *g_max, DATATYPE * g_unwrapped_list)
+__global__ void swapKernel(int size, DATATYPE *g_list, DATATYPE *g_max, DATATYPE * g_sorted_list)
 {
-        
+    int max_index;
+    int max;
+
+        max_index = g_max[0];
+        /* First we swap elements and fill the maximum with the MIN value */
+        max = g_list[max_index];
+        g_list[max_index] = g_list[size - 1];
+        g_list[size - 1] = MIN;
+        /* Then we save the maximum in the last available position of the array */
+        g_sorted_list[size - 1] = max;
+
 }
 
 /* Kernel call that wraps data into a struct with index */
@@ -145,27 +155,30 @@ DATATYPE * reduceMax(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE *g_wb)
     dimGrid.x = blocks;
     dimBlock.x = threads;
 
+    if(PRINTINFO) printf("Bloques: %d, Threads: %d, N: %d\n", dimGrid.x, dimBlock.x, N);
     /* First Reduce */
     reduceKernel<<<dimGrid, dimBlock>>>(N, g_list, g_wa, g_wb); /* Loads 2 data per thread */
+    CudaCheckError();
     temp = (N / (dimBlock.x * 2));
         if (N % (dimBlock.x * 2) != 0)
             temp++;
     N = temp;
 
-    if(dimGrid.x == 1) dimGrid.x = 0;
+    if(dimGrid.x == 1) {
+        dimGrid.x = 0;
+        input = g_wa;
+    }
     else {
         getGridComposition(N, &blocks, &threads, 1);
         dimGrid.x = blocks;
         dimBlock.x = threads;
+        input = g_wb;
+        output = g_wa;
     }
-
-    input = g_wb;
-    output = g_wa;
     /* End of first reduce */
-
     while (dimGrid.x > 0)
     {
-        //printf("Bloques: %d, Threads: %d, N: %d\n", dimGrid.x, dimBlock.x, N);
+        if(PRINTINFO) printf("Bloques: %d, Threads: %d, N: %d\n", dimGrid.x, dimBlock.x, N);
         reduceWithIndexKernel<<<dimGrid, dimBlock>>>(N, g_list, input, output);
         CudaCheckError();
 
@@ -190,20 +203,22 @@ DATATYPE * reduceMax(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE *g_wb)
 }
 
 /* Calls the iterative reduction wrapper and sorts the max results */
-void sortBySelectionIterative(int size, DATATYPE *g_wlist, DATATYPE *g_wa, DATATYPE *g_wb, DATATYPE * g_list)
+void sortBySelectionIterative(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE *g_wb, DATATYPE * g_sorted_list)
 {
-    DATATYPE * result;
-    //VALUETYPE test_list[SIZE];
+    DATATYPE * max;
+    
     for (int i = size; i > 0; i--)
     {
-        result = reduceMax(i, g_wlist, g_wa, g_wb);
-        swapKernel<<<1, 1>>>(i, g_wlist, result, g_list);
+        max = reduceMax(i, g_list, g_wa, g_wb);
+        swapKernel<<<1, 1>>>(i, g_list, max, g_sorted_list);
 
         /* Test */
         /*
-        CudaSafeCall(cudaMemcpy(test_list, g_list, SIZE * sizeof(VALUETYPE), cudaMemcpyDeviceToHost));
+        DATATYPE test_list[SIZE];
+        CudaSafeCall(cudaMemcpy(test_list, g_list, SIZE * sizeof(DATATYPE), cudaMemcpyDeviceToHost));
         printResults(test_list);
         */
+        
     }
 
     return;
@@ -221,9 +236,12 @@ void getGridComposition(int size, unsigned int *blocks, unsigned int *threads, u
         *blocks <<= 1;
     }
 
+
     if(*blocks == 1){
         while( *threads >= size * 2 / data_per_thread )
             *threads >>= 1;
+
+            if (*threads == 0) *threads = 1;
     }
 
     return;
@@ -286,18 +304,17 @@ int main(void)
     /* Allocate device memory */
     
 
-    unsigned int allocate = 1;
+    unsigned int allocate = 2;
     while( allocate < SIZE )
         allocate <<= 1;
 
+    printf("Allocated memory: %d\n", allocate);
     CudaSafeCall(cudaMalloc((void **)&g_sorted_list, SIZE * sizeof(DATATYPE)));
     CudaSafeCall(cudaMalloc((void **)&g_list, allocate * sizeof(DATATYPE)));
-    CudaSafeCall( cudaMalloc((void**)&g_wa, allocate / 2  * sizeof(DATATYPE) ) );
-
-    if(allocate < THREADS)
-        allocate = THREADS;
- 
-    CudaSafeCall( cudaMalloc((void**)&g_wb, (allocate / THREADS)  * sizeof(DATATYPE) ) );
+    CudaSafeCall( cudaMalloc((void**)&g_wa, allocate * sizeof(DATATYPE) ) );
+    //CudaSafeCall( cudaMalloc((void**)&g_wb, (allocate / THREADS)  * sizeof(DATATYPE) ) );
+    CudaSafeCall( cudaMalloc((void**)&g_wb, ((allocate / THREADS) + 1)  * sizeof(DATATYPE) ) );
+    
 
     /* Initialize data */
     for (int i = 0; i < SIZE; i++)
@@ -325,9 +342,10 @@ int main(void)
 
 
     /* Pad data */
-    getGridComposition(SIZE, &blocks, &threads, 1);
+    getGridComposition(allocate, &blocks, &threads, 1);
     dimGrid.x = blocks;
     dimBlock.x = threads;
+    if(PRINTINFO) printf("Bloques: %d, Threads: %d, N: %d\n", dimGrid.x, dimBlock.x, SIZE);
 
     fillDataKernel<<<dimGrid, dimBlock>>>(SIZE, g_list);
     CudaCheckError();
@@ -343,7 +361,7 @@ int main(void)
             cudaEventCreate(&stop);
             cudaEventRecord(start);
         }
-        //sortBySelectionIterative(SIZE, g_wlist, g_wa, g_wb, g_list);
+        sortBySelectionIterative(SIZE, g_list, g_wa, g_wb, g_sorted_list);
         if (RECORDTIME)
         {
             cudaEventRecord(stop);
@@ -353,7 +371,7 @@ int main(void)
             printf("Pasaron %f milisegundos\n", milliseconds);
         }
 
-        CudaSafeCall(cudaMemcpy(list, g_list, SIZE * sizeof(DATATYPE), cudaMemcpyDeviceToHost));
+        CudaSafeCall(cudaMemcpy(list, g_sorted_list, SIZE * sizeof(DATATYPE), cudaMemcpyDeviceToHost));
     } 
 
     DATATYPE * result;
@@ -384,6 +402,7 @@ int main(void)
     
 
     if(TestReduction){
+        printf("The max index is: %d\n", maxidx);
         printf("El maximo es %d\n", list[maxidx]);
     }
 
