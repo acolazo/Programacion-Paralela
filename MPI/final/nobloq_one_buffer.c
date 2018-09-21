@@ -5,7 +5,7 @@
 
 #define MEASURE_PHASES 1
 #define CHECK 1
-#define RANGE 4000
+#define RANGE 8000
 #define NUM_THREADS 4
 #define PROCS 4
 #define COLS RANGE / 2
@@ -345,7 +345,7 @@ int main(int argc, char *argv[])
       sendB = sendData(b, metadata.sendto[1], req_send_b, statuss_s, taskid, &pendingB);
       recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss_r, taskid);
       copyA = copyData(bw, a); /* Podria no hacerlo secuencial */
-      end2 = MPI_Wtime();
+      end2 = MPI_Wtime(); ()
       start2a = MPI_Wtime();
       /* New */
       /*
@@ -374,25 +374,9 @@ int main(int argc, char *argv[])
 #pragma omp barrier
 
     calculateC2 = multiplicarMatrices(a, bw, c);
-
-#pragma omp single
-    {
-      end3 = MPI_Wtime();
-    }
   }
 
-  /*
-  sendA = sendData(a, metadata.sendto[0], req_send_a, statuss, taskid, &pendingA);
-  sendB = sendData(b, metadata.sendto[1], req_send_b, statuss, taskid, &pendingB);
-  recvB = receiveData(a, metadata.receivefrom[1], req_recv, statuss, taskid);
-  
-  recvA = receiveData(bw, metadata.receivefrom[0], req_recv, statuss, taskid);
-  recvB = receiveData(a, metadata.receivefrom[1], req_recv, statuss, taskid);
-
-  calculateC2 = multiplicarMatrices(bw, a, c); //bw contiene a A, y a contiene a B.
-
-  sendB = sendData(b, metadata.sendto[1], req_send_b, statuss, taskid, &pendingB);
-  */
+  end3 = MPI_Wtime();
   end = MPI_Wtime();
   /* Check Results */
   if (CHECK && checkResults(c, OPTION))

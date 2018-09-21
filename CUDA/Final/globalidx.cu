@@ -2,11 +2,11 @@
 #include <time.h>
 #include <math.h>
 
-#define SIZE 150 * 1000
+#define SIZE 500 * 1000
 #define THREADS 256 //best value = 256
 
-#define SORT 1
-#define TestReduction 0
+#define SORT 0
+#define TestReduction 1
 #define PRINT 0
 #define printErrors 0
 #define CHECK 1
@@ -14,15 +14,16 @@
 #define RECORDTIME 1
 #define MIN INT_MIN
 #define PRINTINFO 0
+#define recordPhases 0
 
-#define OPTION 1
+#define OPTION 2
 /*
 1: i+1 
 2: SIZE-i
 3: rand() % 100
 */
 
-#define CUDA_ERROR_CHECK
+//#define CUDA_ERROR_CHECK
 
 /* Function declarations */
 void getGridComposition(int, unsigned int *, unsigned int *, unsigned int);
@@ -99,6 +100,7 @@ __global__ void reduceKernel(int size, DATATYPE * g_list, int * g_inidx, int * g
     unsigned int gid = (blockIdx.x * blockDim.x * 2) + tid;
 
     g_inidx[gid] = g_list[gid] > g_list[gid + blockDim.x] ? gid : gid + blockDim.x;
+    __syncthreads();
 
     for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1)
     {
@@ -108,9 +110,10 @@ __global__ void reduceKernel(int size, DATATYPE * g_list, int * g_inidx, int * g
         }
         __syncthreads();
     }
-
+    
     if (tid == 0)
         g_outidx[blockIdx.x] = g_inidx[gid];
+    
 }
 
 /* This function swaps the MAX element [which should be in position 0] with the last element of the list */
@@ -203,14 +206,40 @@ DATATYPE * reduceMax(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE *g_wb)
 }
 
 /* Calls the iterative reduction wrapper and sorts the max results */
+template <unsigned int recordTime>
 void sortBySelectionIterative(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE *g_wb, DATATYPE * g_sorted_list)
 {
     DATATYPE * max;
-    
+    cudaEvent_t start, stop;
+    float reduce_ms = 0;
+    float swap_ms = 0;
+    float time;
+    if (recordTime)
+    {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);        
+    }
+
     for (int i = size; i > 0; i--)
     {
+        if(recordTime) cudaEventRecord(start);
         max = reduceMax(i, g_list, g_wa, g_wb);
+        if(recordTime){
+            cudaEventRecord(stop);
+            cudaEventSynchronize(stop);
+            cudaEventElapsedTime(&time, start, stop);
+            cudaEventRecord(start);
+        }
         swapKernel<<<1, 1>>>(i, g_list, max, g_sorted_list);
+        CudaCheckError();
+
+        if(recordTime){
+            cudaEventRecord(stop);
+            cudaEventSynchronize(stop);
+            reduce_ms += time;
+            cudaEventElapsedTime(&time, start, stop);
+            swap_ms += time;
+        }
 
         /* Test */
         /*
@@ -218,8 +247,8 @@ void sortBySelectionIterative(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATY
         CudaSafeCall(cudaMemcpy(test_list, g_list, SIZE * sizeof(DATATYPE), cudaMemcpyDeviceToHost));
         printResults(test_list);
         */
-        
     }
+    if(recordTime)  printf( "Swap: %f, Reduce: %f", swap_ms, reduce_ms );
 
     return;
 }
@@ -312,7 +341,6 @@ int main(void)
     CudaSafeCall(cudaMalloc((void **)&g_sorted_list, SIZE * sizeof(DATATYPE)));
     CudaSafeCall(cudaMalloc((void **)&g_list, allocate * sizeof(DATATYPE)));
     CudaSafeCall( cudaMalloc((void**)&g_wa, allocate * sizeof(DATATYPE) ) );
-    //CudaSafeCall( cudaMalloc((void**)&g_wb, (allocate / THREADS)  * sizeof(DATATYPE) ) );
     CudaSafeCall( cudaMalloc((void**)&g_wb, ((allocate / THREADS) + 1)  * sizeof(DATATYPE) ) );
     
 
@@ -333,13 +361,20 @@ int main(void)
         }        
     }
 
-    /* Wrap Data into a struct with index for sorting */
     unsigned int threads, blocks;
     dim3 dimGrid(1, 1, 1);
     dim3 dimBlock(1, 1, 1);
 
     CudaSafeCall( cudaMemcpy(g_list, list, SIZE * sizeof(DATATYPE), cudaMemcpyHostToDevice) );
 
+    /* Record time */
+    cudaEvent_t start, stop;
+    if (RECORDTIME)
+    {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start);
+    }
 
     /* Pad data */
     getGridComposition(allocate, &blocks, &threads, 1);
@@ -353,15 +388,7 @@ int main(void)
 
 
     if (SORT){
-        /* Record time */
-        cudaEvent_t start, stop;
-        if (RECORDTIME)
-        {
-            cudaEventCreate(&start);
-            cudaEventCreate(&stop);
-            cudaEventRecord(start);
-        }
-        sortBySelectionIterative(SIZE, g_list, g_wa, g_wb, g_sorted_list);
+        sortBySelectionIterative<recordPhases>(SIZE, g_list, g_wa, g_wb, g_sorted_list);
         if (RECORDTIME)
         {
             cudaEventRecord(stop);
@@ -377,15 +404,6 @@ int main(void)
     DATATYPE * result;
     DATATYPE maxidx;
     if (TestReduction){
-        /* Record time */
-        cudaEvent_t start, stop;
-        if (RECORDTIME)
-        {
-            cudaEventCreate(&start);
-            cudaEventCreate(&stop);
-            cudaEventRecord(start);
-        }
-
         result = reduceMax(SIZE, g_list, g_wa, g_wb);
 
         if (RECORDTIME)

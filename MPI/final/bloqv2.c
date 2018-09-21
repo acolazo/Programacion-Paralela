@@ -5,7 +5,7 @@
 
 #define MEASURE_PHASES 1
 #define CHECK 1
-#define RANGE 4000
+#define RANGE 8000
 #define NUM_THREADS 4
 #define PROCS 4
 #define COLS RANGE / 2

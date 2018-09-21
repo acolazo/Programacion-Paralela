@@ -3,22 +3,20 @@
 #include <math.h>
 
 #define SIZE 500 * 1000
-#define maxSharedMemory 49152 //bytes per block
+#define maxSharedMemory 49152 //bytes
 #define THREADS 256 //best value = 256
-
 #define SORT 0
 #define TestReduction 1
 #define PRINT 0
 #define printErrors 0
 #define CHECK 1
+#define DATATYPE struct number
+#define VALUETYPE int
 
 #define recordPhases 0
 
-#define DATATYPE struct number
-#define VALUETYPE int
-#define MINVALUE INT_MIN
-
 #define PRINTINFO 0
+#define RECORDTIME 1
 
 #define OPTION 2
 /*
@@ -27,7 +25,6 @@
 3: rand() % 100
 */
 
-#define RECORDTIME 1
 //#define CUDA_ERROR_CHECK
 
 /* Function declarations */
@@ -36,7 +33,7 @@ void getGridComposition(int, unsigned int*, unsigned int*, unsigned int);
 /* Struct for not losing the global index */
 struct number{
     VALUETYPE value;
-    int index;
+    unsigned int index;
 };
 
 /* Error Checking */
@@ -79,6 +76,17 @@ inline void __cudaCheckError ( const char *file, const int line )
 /* Warp reduction */
 template <unsigned int blockSize>
 __device__ void warpReduce(DATATYPE* sdata, unsigned int tid, unsigned int i, int size){
+    if (blockSize >=64) if ((i + 32) < size) sdata[tid] = sdata[tid].value > sdata[tid + 32].value ? sdata[tid] : sdata[tid + 32];
+    if (blockSize >=32) if ((i + 16) < size) sdata[tid] = sdata[tid].value > sdata[tid + 16].value ? sdata[tid] : sdata[tid + 16];
+    if (blockSize >=16) if ((i + 8) < size)  sdata[tid] = sdata[tid].value > sdata[tid + 8].value ? sdata[tid] : sdata[tid + 8];
+    if (blockSize >=8) if ((i + 4) < size)  sdata[tid] = sdata[tid].value > sdata[tid + 4].value ? sdata[tid] : sdata[tid + 4];
+    if (blockSize >=4) if ((i + 2) < size)  sdata[tid] = sdata[tid].value > sdata[tid + 2].value ? sdata[tid] : sdata[tid + 2];
+    if (blockSize >=2) if ((i + 1) < size)  sdata[tid] = sdata[tid].value > sdata[tid + 1].value ? sdata[tid] : sdata[tid + 1];
+};
+
+/* Warp Performant Reduce */
+template <unsigned int blockSize>
+__device__ void warpPerformantReduce(DATATYPE* sdata, unsigned int tid, unsigned int i, int size){
     if (blockSize >=64) sdata[tid] = sdata[tid].value > sdata[tid + 32].value ? sdata[tid] : sdata[tid + 32];
     if (blockSize >=32) sdata[tid] = sdata[tid].value > sdata[tid + 16].value ? sdata[tid] : sdata[tid + 16];
     if (blockSize >=16) sdata[tid] = sdata[tid].value > sdata[tid + 8].value ? sdata[tid] : sdata[tid + 8];
@@ -92,55 +100,47 @@ template <unsigned int blockSize>
 __global__ void reduceKernel(int size, DATATYPE *g_input, DATATYPE *g_output)
 {
     extern __shared__ DATATYPE sdata[];
+
     unsigned int tid = threadIdx.x;
+  //  unsigned int gid = (blockIdx.x*blockDim.x) + tid;
     unsigned int i = (blockIdx.x*blockDim.x * 2) + tid;
-    
     if((i + blockDim.x )< size)
         sdata[tid] = g_input[i].value > g_input[i + blockDim.x].value ? g_input[i] : g_input[ i + blockDim.x];  
-    else if (i<size){
+    else if (i<size)
         sdata[tid] = g_input[i];
-    }
-    else{
-        DATATYPE min_value;
-        min_value.value = MINVALUE;
-        sdata[tid] = min_value;
-    }
-    
-    
-        
 
     __syncthreads();
 
     /* Unrolling all iterations */
     if (blockSize >= 1024) {
         if (tid < 512) {
-            sdata[tid] = sdata[tid].value > sdata[tid + 512].value ? sdata[tid] : sdata[tid + 512]; 
+            if ((i + 512) < size) sdata[tid] = sdata[tid].value > sdata[tid + 512].value ? sdata[tid] : sdata[tid + 512]; 
         }
         __syncthreads(); 
     }
     if (blockSize >= 512) {
         if (tid < 256) { 
-            sdata[tid] = sdata[tid].value > sdata[tid + 256].value ? sdata[tid] : sdata[tid + 256];
+            if ((i + 256) < size) sdata[tid] = sdata[tid].value > sdata[tid + 256].value ? sdata[tid] : sdata[tid + 256];
         }
         __syncthreads(); 
     }
     if (blockSize >= 256) {
         if (tid < 128) { 
-            sdata[tid] = sdata[tid].value > sdata[tid + 128].value ? sdata[tid] : sdata[tid + 128];
+            if ((i + 128) < size) sdata[tid] = sdata[tid].value > sdata[tid + 128].value ? sdata[tid] : sdata[tid + 128];
         } 
         __syncthreads(); 
     }
     if (blockSize >= 128) {
         if (tid <  64) { 
-            sdata[tid] = sdata[tid].value > sdata[tid + 64].value ? sdata[tid] : sdata[tid + 64];
+            if ((i + 64) < size) sdata[tid] = sdata[tid].value > sdata[tid + 64].value ? sdata[tid] : sdata[tid + 64];
         }
         __syncthreads(); 
     }   
     
     if(tid < 32){
-        warpReduce<blockSize>(sdata, tid, i, size);
+        if( (i + 64) < size ) warpPerformantReduce<blockSize>(sdata, tid, i, size);
+        else warpReduce<blockSize>(sdata, tid, i, size);
     }
-    
 
     //write result for this block to global mem
     if (tid == 0) g_output[blockIdx.x] = sdata[tid];   
@@ -148,12 +148,13 @@ __global__ void reduceKernel(int size, DATATYPE *g_input, DATATYPE *g_output)
 
 /* This function swaps the MAX element [which should be in position 0] with the last element of the list */
 /* WARNING: This function must be called by only one block */
-__global__ void swapKernel(int size, DATATYPE *g_list, DATATYPE *g_max, VALUETYPE *g_output){
+__global__ void swapKernel(int size, DATATYPE *g_list, DATATYPE *g_max){
     DATATYPE max;
     DATATYPE last_element;
     int index;
-    //unsigned int tid = threadIdx.x;
+    unsigned int tid = threadIdx.x;
 
+    if(tid == 0){
         max = g_max[0];
         index = max.index;
         max.index = size-1;
@@ -162,14 +163,9 @@ __global__ void swapKernel(int size, DATATYPE *g_list, DATATYPE *g_max, VALUETYP
         last_element.index = index;
 
         g_list[index] = last_element; /* Donde estaba el valor maximo, pongo el ultimo elemento de la lista */
-        
-        g_output[size - 1] = max.value; /* Pongo el maximo en la lista de resultados */
-
-        max.value = MINVALUE; /* Cambio el valor del maximo para que sea el minimo posible */
         g_list[size-1] = max;
-
+    }
 }
-
 
 /* Kernel call that wraps data into a struct with index */
 __global__ void wrapKernel(int size, DATATYPE *g_wrapped_list, VALUETYPE * g_list ){
@@ -283,7 +279,7 @@ DATATYPE * reduceMax(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE *g_wb)
 
 /* Calls the iterative reduction wrapper and sorts the max results */
 template <unsigned int recordTime>
-void sortBySelectionIterative(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE * g_wb, VALUETYPE * g_results){
+void sortBySelectionIterative(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE * g_wb){
 
     DATATYPE * max;
     cudaEvent_t start, stop;
@@ -297,8 +293,9 @@ void sortBySelectionIterative(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATY
         cudaEventCreate(&stop);        
     }
 
-    for (int i = size; i > 0; i--)
+    for (int i = size; i > 1; i--)
     {
+        
         if(recordTime) cudaEventRecord(start);
         max = reduceMax(i, g_list, g_wa, g_wb);
         if(recordTime){
@@ -307,9 +304,7 @@ void sortBySelectionIterative(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATY
             cudaEventElapsedTime(&time, start, stop);
             cudaEventRecord(start);
         }
-        swapKernel<<<1, 1>>>(i, g_list, max, g_results);
-        CudaCheckError();
-
+        swapKernel<<<1, 1>>>(i, g_list, max);
         if(recordTime){
             cudaEventRecord(stop);
             cudaEventSynchronize(stop);
@@ -318,16 +313,11 @@ void sortBySelectionIterative(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATY
             swap_ms += time;
         }
 
-        /* Test */
-        /*
-        DATATYPE test_list[SIZE];
-        CudaSafeCall(cudaMemcpy(test_list, g_list, SIZE * sizeof(DATATYPE), cudaMemcpyDeviceToHost));
-        printResults(test_list);
-        */
     }
     if(recordTime)  printf( "Swap: %f, Reduce: %f\n", swap_ms, reduce_ms );
 
     return;
+ 
 }
 
 /* Get the number of blocks and threads per block */
@@ -346,6 +336,7 @@ void getGridComposition(int size, unsigned int* blocks, unsigned int* threads, u
 
         if (*threads == 0) *threads = 1;
     }
+    
 
     return;
 }
@@ -407,29 +398,28 @@ int main(void)
     CudaSafeCall( cudaMalloc((void**)&g_list, SIZE * sizeof(DATATYPE)) );
 
     allocate = 1;
-    while (allocate < SIZE || allocate < THREADS)
+    while(allocate < SIZE || allocate < THREADS)
         allocate <<= 1;
-    
-    CudaSafeCall( cudaMalloc((void**)&g_wa, allocate / THREADS * sizeof(DATATYPE)) );
-    CudaSafeCall( cudaMalloc((void**)&g_wb, allocate / THREADS * sizeof(DATATYPE)) );
 
-    if (PRINTINFO) printf("Allocate: %d, Max Threads: %d\n", allocate, THREADS);
-   /* Initialize data */
-   for (int i = 0; i < SIZE; i++)
-   {   
-       switch(OPTION){
-           case 1:
-           list[i] = i + 1;
-           break;
-           case 2:
-           list[i] = SIZE - i;
-           break;
-           case 3:
-           list[i] = rand() % 100;
-           break;
-       }        
-   }
-   /* End of initializing data */
+    CudaSafeCall( cudaMalloc((void**)&g_wa, allocate / THREADS * sizeof(DATATYPE) ) );
+    CudaSafeCall( cudaMalloc((void**)&g_wb, allocate / THREADS * sizeof(DATATYPE) ) );
+
+    /* Initialize data */
+    for (int i = 0; i < SIZE; i++)
+    {   
+        switch(OPTION){
+            case 1:
+            list[i] = i + 1;
+            break;
+            case 2:
+            list[i] = SIZE - i;
+            break;
+            case 3:
+            list[i] = rand() % 100;
+            break;
+        }        
+    }
+
     /* Wrap Data into a struct with index for sorting */
     unsigned int threads, blocks;
     dim3 dimGrid(1, 1, 1);
@@ -448,13 +438,15 @@ int main(void)
     getGridComposition(SIZE, &blocks, &threads, 1);
     dimGrid.x = blocks;
     dimBlock.x = threads;
-    
+
     wrapKernel<<<dimGrid, dimBlock>>>(SIZE, g_list, g_unwrapped );
     /* End of wrapping data */
 
 
     if (SORT){
-        sortBySelectionIterative<recordPhases>(SIZE, g_list, g_wa, g_wb, g_unwrapped);
+        sortBySelectionIterative<recordPhases>(SIZE, g_list, g_wa, g_wb);
+        unwrapKernel<<<dimGrid, dimBlock>>>(SIZE, g_list, g_unwrapped );
+        CudaCheckError();
         if(RECORDTIME){
             cudaEventRecord(stop);
             cudaEventSynchronize(stop);
@@ -462,15 +454,15 @@ int main(void)
             cudaEventElapsedTime(&milliseconds, start, stop);
             printf("Pasaron %f milisegundos\n", milliseconds);
         }
+
+       
         CudaSafeCall( cudaMemcpy(list,g_unwrapped , SIZE * sizeof(VALUETYPE), cudaMemcpyDeviceToHost) );
     } 
 
     if (TestReduction){
-
         DATATYPE * result;
-        
         result = reduceMax(SIZE, g_list, g_wa, g_wb);
-        unwrapKernel<<<1, 1>>>(1, result, g_unwrapped );
+        unwrapKernel<<<1, 1>>>(1,result, g_unwrapped );
 
         if(RECORDTIME){
             cudaEventRecord(stop);
@@ -481,8 +473,11 @@ int main(void)
         } 
 
         CudaSafeCall( cudaMemcpy(list,g_unwrapped , 1 * sizeof(VALUETYPE), cudaMemcpyDeviceToHost) );
-
     } 
+    
+    
+
+    /* End of unwrapping data */
 
     if(TestReduction){
         printf("El maximo es %d\n", list[0]);

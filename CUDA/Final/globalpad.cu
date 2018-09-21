@@ -2,12 +2,12 @@
 #include <time.h>
 #include <math.h>
 
-#define SIZE 150 * 1000
+#define SIZE 500 * 1000
 
 #define THREADS 256 //best value = 256
 
-#define SORT 1
-#define TestReduction 0
+#define SORT 0
+#define TestReduction 1
 #define PRINT 0
 #define printErrors 0
 #define CHECK 1
@@ -15,8 +15,9 @@
 #define VALUETYPE int
 #define RECORDTIME 1
 #define MIN INT_MIN
+#define recordPhases 0
 
-#define OPTION 1
+#define OPTION 2
 /*
 1: i+1 
 2: SIZE-i
@@ -207,23 +208,52 @@ DATATYPE * reduceMax(int size, DATATYPE *g_list, DATATYPE *g_wa, DATATYPE *g_wb)
 }
 
 /* Calls the iterative reduction wrapper and sorts the max results */
+template <unsigned int recordTime>
 void sortBySelectionIterative(int size, DATATYPE *g_wlist, DATATYPE *g_wa, DATATYPE *g_wb, VALUETYPE * g_list)
 {
     DATATYPE * result;
-    //VALUETYPE test_list[SIZE];
+    cudaEvent_t start, stop;
+    float reduce_ms = 0;
+    float swap_ms = 0;
+    float time;
+    if (recordTime)
+    {
+        
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);        
+    }
+
     for (int i = size; i > 0; i--)
     {
+        if(recordTime) cudaEventRecord(start);
         result = reduceMax(i, g_wlist, g_wa, g_wb);
+        if(recordTime){
+            cudaEventRecord(stop);
+            cudaEventSynchronize(stop);
+            cudaEventElapsedTime(&time, start, stop);
+            cudaEventRecord(start);
+        }
         swapKernel<<<1, 1>>>(i, g_wlist, result, g_list);
+
+        if(recordTime){
+            cudaEventRecord(stop);
+            cudaEventSynchronize(stop);
+            reduce_ms += time;
+            cudaEventElapsedTime(&time, start, stop);
+            swap_ms += time;
+        }
 
         /* Test */
         /*
-        CudaSafeCall(cudaMemcpy(test_list, g_list, SIZE * sizeof(VALUETYPE), cudaMemcpyDeviceToHost));
+        DATATYPE test_list[SIZE];
+        CudaSafeCall(cudaMemcpy(test_list, g_list, SIZE * sizeof(DATATYPE), cudaMemcpyDeviceToHost));
         printResults(test_list);
         */
     }
+    if(recordTime)  printf( "Swap: %f, Reduce: %f\n", swap_ms, reduce_ms );
 
     return;
+        
 }
 
 /* Get the number of blocks and threads per block */
@@ -344,6 +374,16 @@ int main(void)
 
     CudaSafeCall( cudaMemcpy(g_list, list, SIZE * sizeof(VALUETYPE), cudaMemcpyHostToDevice) );
 
+
+    /* Record time */
+    cudaEvent_t start, stop;
+    if (RECORDTIME)
+    {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start);
+    }
+
     getGridComposition(SIZE, &blocks, &threads);
     dimGrid.x = blocks;
     dimBlock.x = threads;
@@ -354,15 +394,7 @@ int main(void)
 
 
     if (SORT){
-        /* Record time */
-        cudaEvent_t start, stop;
-        if (RECORDTIME)
-        {
-            cudaEventCreate(&start);
-            cudaEventCreate(&stop);
-            cudaEventRecord(start);
-        }
-        sortBySelectionIterative(SIZE, g_wlist, g_wa, g_wb, g_list);
+        sortBySelectionIterative<recordPhases>(SIZE, g_wlist, g_wa, g_wb, g_list);
         if (RECORDTIME)
         {
             cudaEventRecord(stop);
@@ -377,16 +409,9 @@ int main(void)
 
     DATATYPE * result;
     if (TestReduction){
-        /* Record time */
-        cudaEvent_t start, stop;
-        if (RECORDTIME)
-        {
-            cudaEventCreate(&start);
-            cudaEventCreate(&stop);
-            cudaEventRecord(start);
-        }
-
         result = reduceMax(SIZE, g_wlist, g_wa, g_wb);
+        unwrapKernel<<<1, 1>>>(1, result, g_list);
+        CudaCheckError();
 
         if (RECORDTIME)
         {
@@ -397,8 +422,6 @@ int main(void)
             printf("Pasaron %f milisegundos\n", milliseconds);
         }
 
-        unwrapKernel<<<1, 1>>>(1, result, g_list);
-        CudaCheckError();
         CudaSafeCall(cudaMemcpy(list, g_list, 1 * sizeof(VALUETYPE), cudaMemcpyDeviceToHost));
     } 
     
