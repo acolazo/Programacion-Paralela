@@ -372,7 +372,7 @@ int main(int argc, char *argv[])
       start3 = MPI_Wtime();
     }
 #pragma omp barrier
-
+0'0pó0l0po9olik'''7777765
     calculateC2 = multiplicarMatrices(a, bw, c);
   }
 
